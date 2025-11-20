@@ -5,6 +5,7 @@ services:
     runtime: python
     region: oregon
     plan: free
+    rootDir: backend
     # Install Python libraries AND the Browser for Playwright
     buildCommand: pip install -r requirements.txt && python -m playwright install chromium
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -20,6 +21,7 @@ services:
     runtime: python
     region: oregon
     plan: free
+    rootDir: frontend
     buildCommand: pip install -r requirements.txt
     # Start Streamlit on the specific port Render assigns
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
