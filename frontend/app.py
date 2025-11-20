@@ -39,65 +39,85 @@ if scan_button and url_input:
                     report = data.get("report", {})
                     ai_insight = data.get("ai_insight", "No AI summary available.")
                     
-                    # --- RESULTS DASHBOARD ---
+                  # --- RESULTS DASHBOARD ---
                     st.success("Audit Complete!")
                     
-                    # 1. AI SUMMARY
-                    st.subheader("🤖 Executive Summary (AI)")
-                    st.info(ai_insight)
-                    
-                    # 2. METRICS ROW
+                    # 1. AI EXECUTIVE SUMMARY
+                    with st.container():
+                        st.subheader("🤖 Executive Summary")
+                        st.info(ai_insight)
+
+                    st.divider()
+
+                    # 2. HIGH-LEVEL METRICS
                     stats = report.get("metadata", {}).get("severity_breakdown", {})
                     total = report.get("metadata", {}).get("total_issues", 0)
                     
-                    m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Total Issues", total)
-                    m2.metric("🔥 Critical", stats.get("critical", 0))
-                    m3.metric("🔸 Serious", stats.get("serious", 0))
-                    m4.metric("🔹 Minor", stats.get("minor", 0))
-                    
-                
-                  # 3. DEVELOPER TASK LIST
-                    st.subheader("🛠️ Developer Task List")
-                    st.markdown("---")
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Total Violations", total)
+                    c2.metric("🔥 Critical", stats.get("critical", 0))
+                    c3.metric("🔸 Serious", stats.get("serious", 0))
+                    c4.metric("🔹 Minor", stats.get("minor", 0))
+
+                    st.divider()
+
+                    # 3. PRIORITIZATION MATRIX (The "Good Table")
+                    st.subheader("📊 Violation Overview")
                     
                     issues = report.get("issues", [])
                     
                     if issues:
+                        # Create a clean summary table for the top view
+                        summary_data = []
+                        for i in issues:
+                            summary_data.append({
+                                "Priority": "🔴 High" if "HIGH" in i['fix_priority'] else "🟠 Medium" if "MEDIUM" in i['fix_priority'] else "🔵 Low",
+                                "Rule ID": i['rule'],
+                                "Issue Description": i['description'],
+                                "Occurrences": i['total_occurrences'],
+                                "WCAG Criteria": i['wcag']
+                            })
+                        
+                        df = pd.DataFrame(summary_data)
+                        st.dataframe(
+                            df, 
+                            use_container_width=True,
+                            column_config={
+                                "Occurrences": st.column_config.ProgressColumn(
+                                    "Count", 
+                                    format="%d", 
+                                    min_value=0, 
+                                    max_value=max(df["Occurrences"]) if not df.empty else 10
+                                )
+                            }
+                        )
+
+                        # 4. DEVELOPER TASK LIST (The Details)
+                        st.subheader("🛠️ Developer Action Plan")
+                        st.caption("Expand items below to see code snippets.")
+                        
                         for index, issue in enumerate(issues):
-                            # Priority Badge Color
                             p_color = "red" if "HIGH" in issue['fix_priority'] else "orange" if "MEDIUM" in issue['fix_priority'] else "blue"
                             
-                            # Create a clean card for each issue group
-                            with st.container():
-                                c1, c2 = st.columns([0.1, 0.9])
+                            with st.expander(f":{p_color}[{issue['fix_priority']}] **{issue['rule']}** ({issue['total_occurrences']} issues)"):
+                                st.markdown(f"**Description:** {issue['description']}")
+                                st.markdown(f"**Compliance:** WCAG {issue['wcag']}")
                                 
-                                # A Checkbox to mark as "Done" (Visual only for now)
-                                with c1:
-                                    st.checkbox(f"## {index}", key=f"check_{index}", label_visibility="hidden")
+                                tabs = st.tabs(["📍 Locations & Code", "💡 AI Fix Advice"])
                                 
-                                with c2:
-                                    # Title Row
-                                    st.markdown(f":{p_color}[**{issue['fix_priority']}**] : **{issue['rule']}**")
-                                    st.caption(f"{issue['description']} (Affects {issue['total_occurrences']} elements)")
-                                    
-                                    # Expander for the gritty details
-                                    with st.expander("View Code & Fixes"):
-                                        # AI Hint (Static for now, but could be dynamic)
-                                        st.info(f"**How to fix:** Ensure {issue['rule']} follows WCAG {issue['wcag']} standards.")
-                                        
-                                        # Code Snippets
-                                        snippets = issue.get("code_snippets", [])
-                                        for i, snippet in enumerate(snippets):
-                                            st.markdown(f"**Location {i+1}:** `{snippet.get('target')}`")
-                                            st.code(snippet.get('html'), language='html')
-                                            st.divider()
-                            
-                            # Spacer between tasks
-                            st.write("")
+                                with tabs[0]:
+                                    snippets = issue.get("code_snippets", [])
+                                    for i, snippet in enumerate(snippets):
+                                        st.markdown(f"**Location {i+1}:** `{snippet.get('target')}`")
+                                        st.code(snippet.get('html'), language='html')
+                                        st.divider()
+                                
+                                with tabs[1]:
+                                    st.info(f"Standard fix for **{issue['rule']}**: Ensure elements comply with WCAG {issue['wcag']}. Check generic accessibility documentation for {issue['rule']}.")
+
                     else:
                         st.balloons()
-                        st.success("No violations found! Great job.")
+                        st.success("🎉 Perfect Score! No violations found.")
             else:
                 st.error(f"Server Error: {response.status_code}")
                 

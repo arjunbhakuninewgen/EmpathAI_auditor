@@ -1,0 +1,202 @@
+[
+  {
+    "id": "issue-01",
+    "name": "missing-lang",
+    "selector": "html",
+    "snippet": "<html>",
+    "description": "The <html> element does not have a lang attribute.",
+    "wcag": ["3.1.1"],
+    "severity": "Critical",
+    "notes": "Add lang='en' to the html tag."
+  },
+  {
+    "id": "issue-02",
+    "name": "image-alt-missing",
+    "selector": "#logo-img",
+    "snippet": "<img src='...' id='logo-img'>",
+    "description": "Image missing alt attribute.",
+    "wcag": ["1.1.1"],
+    "severity": "Critical",
+    "notes": "Add alt='Company Logo'."
+  },
+  {
+    "id": "issue-03",
+    "name": "decorative-image-alt",
+    "selector": ".decoration",
+    "snippet": "<img ... alt='decorative swoosh'>",
+    "description": "Decorative image has description in alt attribute.",
+    "wcag": ["1.1.1"],
+    "severity": "Minor",
+    "notes": "Use alt='' (empty string) for decorative images."
+  },
+  {
+    "id": "issue-04",
+    "name": "color-contrast",
+    "selector": ".low-contrast",
+    "snippet": "<p class='low-contrast'>...",
+    "description": "Text has a contrast ratio of 2.84:1, expected 4.5:1.",
+    "wcag": ["1.4.3"],
+    "severity": "Serious",
+    "notes": "Darken the text color to #767676 or darker."
+  },
+  {
+    "id": "issue-05",
+    "name": "heading-order",
+    "selector": "h3",
+    "snippet": "<h3>Welcome...</h3>",
+    "description": "Heading level skipped: h3 used before h2.",
+    "wcag": ["2.4.6"],
+    "severity": "Moderate",
+    "notes": "Change h3 to h1 (if main title) or ensure hierarchy flows h1 -> h2."
+  },
+  {
+    "id": "issue-06",
+    "name": "link-new-window",
+    "selector": "#unsafe-link",
+    "snippet": "<a target='_blank'>",
+    "description": "Link opens in new window without rel='noopener' or visual warning.",
+    "wcag": ["2.4.2"],
+    "severity": "Moderate",
+    "notes": "Add rel='noopener noreferrer' and text '(opens in new tab)'."
+  },
+  {
+    "id": "issue-07",
+    "name": "link-name-vague",
+    "selector": "#interactive-mess p a",
+    "snippet": "<a href='#'>click here</a>",
+    "description": "Link text 'click here' creates ambiguous context.",
+    "wcag": ["2.4.4"],
+    "severity": "Serious",
+    "notes": "Change text to 'Learn more about accessibility'."
+  },
+  {
+    "id": "issue-08",
+    "name": "label-missing",
+    "selector": "#username",
+    "snippet": "<input id='username'>",
+    "description": "Form control does not have a label.",
+    "wcag": ["1.3.1", "3.3.2"],
+    "severity": "Critical",
+    "notes": "Add <label for='username'>Username</label>."
+  },
+  {
+    "id": "issue-09",
+    "name": "aria-valid-attr-value",
+    "selector": "#email",
+    "snippet": "aria-describedby='non-existent-helper-text'",
+    "description": "ARIA attribute points to an ID that does not exist.",
+    "wcag": ["4.1.2"],
+    "severity": "Serious",
+    "notes": "Remove the attribute or ensure the ID exists."
+  },
+  {
+    "id": "issue-10",
+    "name": "tabindex-positive",
+    "selector": "button[tabindex='1']",
+    "snippet": "<button tabindex='1'>",
+    "description": "Element has a positive tabindex which disrupts focus order.",
+    "wcag": ["2.4.3"],
+    "severity": "Serious",
+    "notes": "Remove tabindex or set to 0."
+  },
+  {
+    "id": "issue-11",
+    "name": "role-missing-button",
+    "selector": "#fake-button",
+    "snippet": "<div onclick='...'>",
+    "description": "Div used as button without role='button' or keyboard handlers.",
+    "wcag": ["4.1.2", "2.1.1"],
+    "severity": "Critical",
+    "notes": "Change <div> to <button>."
+  },
+  {
+    "id": "issue-12",
+    "name": "bypass-blocks",
+    "selector": "body",
+    "snippet": "<body>",
+    "description": "Page lacks a way to skip repetitive navigation.",
+    "wcag": ["2.4.1"],
+    "severity": "Serious",
+    "notes": "Add a 'Skip to main content' link as the first element."
+  },
+  {
+    "id": "issue-13",
+    "name": "modal-interaction",
+    "selector": "#modal-overlay",
+    "snippet": "<div id='modal-overlay'>",
+    "description": "Modal does not trap focus and lacks aria-modal='true'.",
+    "wcag": ["2.1.1"],
+    "severity": "Critical",
+    "notes": "Implement focus trapping via JS and add role='dialog'."
+  },
+  {
+    "id": "issue-14",
+    "name": "aria-allowed-attr",
+    "selector": "#bad-live-region",
+    "snippet": "<div role='status' tabindex='0'>",
+    "description": "Element with role='status' should not be focusable.",
+    "wcag": ["4.1.2"],
+    "severity": "Minor",
+    "notes": "Remove tabindex='0'."
+  },
+  {
+    "id": "issue-15",
+    "name": "status-message-missing",
+    "selector": "#ticker",
+    "snippet": "<div id='ticker'>",
+    "description": "Content updates dynamically without aria-live region.",
+    "wcag": ["4.1.3"],
+    "severity": "Serious",
+    "notes": "Add aria-live='polite' to #ticker."
+  },
+  {
+    "id": "issue-16",
+    "name": "keyboard-trap",
+    "selector": "#keyboard-trap input",
+    "snippet": "<input placeholder='Try to leave...'>",
+    "description": "Script prevents tabbing away from this element.",
+    "wcag": ["2.1.1"],
+    "severity": "Critical",
+    "notes": "Remove the keydown event listener preventing Tab."
+  },
+  {
+    "id": "issue-17",
+    "name": "video-caption",
+    "selector": "#uncaptioned-video",
+    "snippet": "<video>",
+    "description": "Video element lacks captions/track.",
+    "wcag": ["1.2.2"],
+    "severity": "Critical",
+    "notes": "Add <track kind='captions' src='...' >."
+  },
+  {
+    "id": "issue-18",
+    "name": "focus-order-css",
+    "selector": ".nav-reverse",
+    "snippet": "flex-direction: row-reverse",
+    "description": "Visual order is reversed from DOM order, confusing keyboard users.",
+    "wcag": ["2.4.3"],
+    "severity": "Serious",
+    "notes": "Reorder HTML LI elements and remove row-reverse."
+  },
+  {
+    "id": "issue-19",
+    "name": "image-of-text",
+    "selector": "#hero-image-text",
+    "snippet": "<img id='hero-image-text'>",
+    "description": "Image contains text that could be HTML text.",
+    "wcag": ["1.4.5"],
+    "severity": "Moderate",
+    "notes": "Replace image with styled HTML text."
+  },
+  {
+    "id": "issue-20",
+    "name": "use-of-color",
+    "selector": "#username",
+    "snippet": "class='red-border'",
+    "description": "Meaning conveyed by color alone (Red border = required).",
+    "wcag": ["1.4.1"],
+    "severity": "Serious",
+    "notes": "Add 'required' attribute or text label '(*)'."
+  }
+]

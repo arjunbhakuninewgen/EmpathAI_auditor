@@ -51,14 +51,14 @@ class OrchestratorAgent:
         print("🤖 AGENT: Asking Gemini to summarize the structured report...")
         
         prompt = f"""
-        You are a Senior Frontend Tech Lead.
-        Analyze this accessibility report: {structured_report}
+        You are a Senior Accessibility Consultant.
+        Analyze this WCAG accessibility report: {structured_report}
         
         Output Requirements:
-        1. EXECUTIVE SUMMARY: Write exactly 3 short bullet points summarizing the overall health. No fluff.
-        2. DEV TASKS: For each unique rule ID found in the report, write a one-sentence technical instruction on how to fix it in HTML/CSS.
+        1. EXECUTIVE SUMMARY: Write a professional 3-4 sentence paragraph summarizing the site's accessibility health. Mention the total issue count and the most critical risk found. (Do not use bullet points here).
         
-        Keep it extremely concise. Developers do not like reading long text.
+        2. DEV TASKS: For each unique rule ID, provide a concise, technical instruction.
+        Format: "Rule ID: Actionable fix".
         """
 
         try:

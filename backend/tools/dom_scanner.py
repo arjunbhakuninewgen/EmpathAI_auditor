@@ -53,32 +53,60 @@ async def scan_page(url: str):
 def clean_violations(violations):
     simplified = []
     for v in violations:
-        # Handle Object vs Dict (Safety check)
-        is_dict = isinstance(v, dict)
+        # --- DEBUG: PRINT THE RAW ID TO TERMINAL ---
+        # This helps us see if the ID exists before we process it
+        raw_id = getattr(v, "id", None)
+        if not raw_id and isinstance(v, dict):
+            raw_id = v.get("id")
+        print(f"🔍 Processing Rule: {raw_id}") 
+        # -------------------------------------------
+
+        # 1. Extract ID (The Name of the Error)
+        # Try attribute first, then dictionary, then fallback
+        rule_id = getattr(v, "id", None)
+        if rule_id is None and isinstance(v, dict):
+            rule_id = v.get("id")
+        if rule_id is None:
+            rule_id = "unknown-rule"
+
+        # 2. Extract Impact (Severity)
+        impact = getattr(v, "impact", None)
+        if impact is None and isinstance(v, dict):
+            impact = v.get("impact")
         
-        # Extract the raw nodes (the specific HTML elements)
-        raw_nodes = v.get("nodes", []) if is_dict else getattr(v, "nodes", [])
+        # 3. Extract Description
+        description = getattr(v, "help", None) # 'help' is usually better/shorter than 'description'
+        if description is None and isinstance(v, dict):
+            description = v.get("help")
+
+        # 4. Extract Nodes (The HTML Snippets)
+        raw_nodes = getattr(v, "nodes", [])
+        if not raw_nodes and isinstance(v, dict):
+            raw_nodes = v.get("nodes", [])
         
         node_details = []
         for node in raw_nodes:
-            # Extract HTML snippet and CSS Selector
-            if is_dict:
-                node_details.append({
-                    "html": node.get("html"),
-                    "target": node.get("target", ["Unknown"])[0] # CSS Selector
-                })
-            else:
-                # If it's an object
-                node_details.append({
-                    "html": getattr(node, "html", ""),
-                    "target": getattr(node, "target", ["Unknown"])[0]
-                })
+            # Extract HTML snippet and Target (Selector)
+            html_snippet = getattr(node, "html", "")
+            target_list = getattr(node, "target", [])
+            
+            if not html_snippet and isinstance(node, dict):
+                html_snippet = node.get("html", "")
+                target_list = node.get("target", [])
+
+            selector = target_list[0] if target_list else "Unknown Selector"
+
+            node_details.append({
+                "html": html_snippet,
+                "target": selector
+            })
 
         simplified.append({
-            "rule_id": v.get("id") if is_dict else getattr(v, "id", "unknown"),
-            "impact": v.get("impact") if is_dict else getattr(v, "impact", "minor"),
-            "description": v.get("description") if is_dict else getattr(v, "description", ""),
+            "id": rule_id, # <--- This is the critical fix
+            "impact": impact,
+            "description": description,
             "count": len(raw_nodes),
-            "nodes": node_details # <--- WE KEEP THIS NOW!
+            "nodes": node_details
         })
+        
     return simplified

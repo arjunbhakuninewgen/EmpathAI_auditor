@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!-- ISSUE 01: Missing lang attribute (WCAG 3.1.1) -->
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmpathAI Calibration Site</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- ISSUE 12: Missing Skip to Content link (WCAG 2.4.1) -->
+</head>
+<body>
+
+    <header>
+        <!-- ISSUE 02: Image missing alt text (WCAG 1.1.1) -->
+        <img src="https://via.placeholder.com/150x50?text=LOGO" id="logo-img">
+        
+        <nav>
+            <!-- ISSUE 18: Focus order unintuitive (Visual order != DOM order via CSS) (WCAG 2.4.3) -->
+            <ul class="nav-reverse">
+                <li><a href="#">Home</a></li>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="main-content">
+        
+        <!-- ISSUE 05: Incorrect heading order (H3 before H2) (WCAG 2.4.6) -->
+        <h3>Welcome to the inaccessible zone</h3>
+        
+        <!-- ISSUE 19: Image of text (WCAG 1.4.5) -->
+        <img src="https://via.placeholder.com/600x200?text=HUGE+SALE+TEXT" alt="Huge Sale Text" id="hero-image-text">
+
+        <!-- ISSUE 03: Decorative image with non-empty alt (WCAG 1.1.1) -->
+        <img src="https://via.placeholder.com/100?text=Deco" alt="decorative swoosh" class="decoration">
+
+        <section id="content-area">
+            <h2>User Details</h2>
+            
+            <!-- ISSUE 20: Use of color alone (WCAG 1.4.1) -->
+            <p id="color-warning">Fields in red are mandatory.</p>
+            
+            <form action="#">
+                <!-- ISSUE 08: Missing label (placeholder only) (WCAG 1.3.1, 3.3.2) -->
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Enter Username" class="red-border">
+                </div>
+
+                <!-- ISSUE 09: Invalid ARIA describedby (WCAG 4.1.2) -->
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" aria-describedby="non-existent-helper-text">
+                </div>
+
+                <!-- ISSUE 04: Low contrast text (WCAG 1.4.3) -->
+                <p class="low-contrast">
+                    Note: This text is extremely hard to read for low vision users.
+                </p>
+            </form>
+        </section>
+
+        <section id="interactive-mess">
+            <!-- ISSUE 10: Positive tabindex (WCAG 2.4.3) -->
+            <button tabindex="1">I steal focus first</button>
+
+            <!-- ISSUE 11: Non-semantic clickable element (WCAG 4.1.2, 2.1.1) -->
+            <div id="fake-button" onclick="alert('Clicked!')">I am a DIV button</div>
+            
+            <!-- ISSUE 07: Vague anchor text (WCAG 2.4.4) -->
+            <p>To learn more about accessibility, <a href="#">click here</a>.</p>
+
+            <!-- ISSUE 06: New window without warning (WCAG 2.4.2) -->
+            <a href="https://google.com" target="_blank" id="unsafe-link">External Link</a>
+        </section>
+
+        <section id="media-section">
+            <!-- ISSUE 17: Missing captions (WCAG 1.2.2) -->
+            <video width="320" height="240" controls id="uncaptioned-video">
+                <source src="movie.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </section>
+
+        <section id="widget-section">
+            <h2>Widgets</h2>
+            
+            <!-- ISSUE 16: Keyboard trap (WCAG 2.1.1) -->
+            <div id="keyboard-trap" tabindex="0">
+                <p><strong>Trap Zone:</strong> Once you tab in here, you cannot tab out.</p>
+                <input type="text" placeholder="Try to leave...">
+            </div>
+
+            <!-- ISSUE 13: Inaccessible Modal Trigger -->
+            <button id="open-modal">Open Modal</button>
+        </section>
+
+        <!-- ISSUE 15: Auto-updating content without aria-live (WCAG 4.1.3) -->
+        <div id="ticker">
+            Stock Price: <span id="price">100.00</span>
+        </div>
+
+        <!-- ISSUE 14: Live region misuse (role status + tabindex) (WCAG 4.1.2) -->
+        <div role="status" tabindex="0" id="bad-live-region">
+            I am a status message that receives focus.
+        </div>
+        
+        <!-- TRUE NEGATIVE: Accessible element for contrast check -->
+        <button class="good-contrast">I am accessible (Good Contrast)</button>
+
+    </main>
+
+    <!-- Inaccessible Modal Markup -->
+    <!-- ISSUE 13: Modal not trapping focus, no aria-modal (WCAG 2.1.1) -->
+    <div id="modal-overlay" class="hidden">
+        <div class="modal-content">
+            <h4>Bad Modal</h4>
+            <p>I don't trap focus. Tab again and you'll go back to the main page behind me.</p>
+            <button id="close-modal">Close</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

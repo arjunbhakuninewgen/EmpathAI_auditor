@@ -1,0 +1,84 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+}
+
+/* ISSUE 04: Low Contrast */
+.low-contrast {
+    color: #999999; /* Ratio approx 2.8:1 against white (Fails AA) */
+    background-color: #ffffff;
+    padding: 10px;
+}
+
+/* ISSUE 18: Visual Order mismatch */
+.nav-reverse {
+    display: flex;
+    flex-direction: row-reverse; /* Visual: Contact, About, Home | DOM: Home, About, Contact */
+    list-style: none;
+    gap: 20px;
+}
+
+/* ISSUE 20: Color alone */
+.red-border {
+    border: 2px solid red; /* User expected to know red means "required" */
+}
+#color-warning {
+    color: red;
+}
+
+/* ISSUE 11: Fake button styling */
+#fake-button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px;
+    display: inline-block;
+    margin-top: 10px;
+    cursor: pointer;
+    /* Missing focus styles */
+}
+
+/* ISSUE 16: Keyboard trap styling */
+#keyboard-trap {
+    border: 3px solid orange;
+    padding: 20px;
+    background: #fff;
+    margin-top: 20px;
+}
+#keyboard-trap:focus {
+    outline: 2px solid red;
+}
+
+/* Modal Styling */
+.hidden {
+    display: none;
+}
+#modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+}
+.modal-content {
+    background: white;
+    margin: 100px auto;
+    padding: 20px;
+    width: 300px;
+}
+
+/* True Negative (Good Contrast) */
+.good-contrast {
+    background-color: #000;
+    color: #fff; /* 21:1 Ratio */
+    padding: 10px;
+    border: none;
+    margin-top: 20px;
+}
+
+/* ISSUE 10: Tabindex highlighting */
+button[tabindex="1"] {
+    border: 4px dashed purple;
+}
