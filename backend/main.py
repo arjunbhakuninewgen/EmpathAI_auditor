@@ -2,7 +2,18 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from orchestrator import OrchestratorAgent # <-- Import the agent
 
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="EmpathAI WCAG Auditor")
+
+# --- 2. ADD THIS MIDDLEWARE BLOCK ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows ALL domains (e.g., your local HTML file or Netlify)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows ALL methods (POST, GET, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows ALL headers
+)
+# 
 agent = OrchestratorAgent() # <-- Initialize the agent
 
 class ScanRequest(BaseModel):
