@@ -8,7 +8,7 @@ API_URL = "https://empathai-backend.onrender.com/scan"
 
 st.set_page_config(page_title="EmpathAI Auditor", page_icon="♿", layout="wide")
 
-# --- HEADER ---
+# --- HEADER ---  
 st.title("♿ EmpathAI: Accessibility Auditor Agent")
 st.markdown("Enter a URL below. Your AI Agent will scan, analyze, and critique the accessibility.")
 
