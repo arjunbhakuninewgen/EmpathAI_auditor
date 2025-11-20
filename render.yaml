@@ -1,0 +1,31 @@
+services:
+  # --- 1. BACKEND SERVICE (FastAPI) ---
+  - type: web
+    name: empathai-backend
+    runtime: python
+    plan: free
+    # Install Python libraries AND the Browser for Playwright
+    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
+    # Start the Uvicorn server
+    startCommand: python backend/main.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: GOOGLE_API_KEY
+        sync: false  # This forces Render to ask you for the key securely
+
+  # --- 2. FRONTEND SERVICE (Streamlit) ---
+  - type: web
+    name: empathai-frontend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Start Streamlit on the specific port Render assigns
+    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: API_URL
+        # Internal Networking: The frontend talks to the backend directly via Render's private network
+        # This is faster and more secure than using the public https URL
+        value: http://empathai-backend:8000/scan
