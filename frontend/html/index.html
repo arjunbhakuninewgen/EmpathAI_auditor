@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>♿ EmpathAI Auditor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            flex: 3;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .divider {
+            border-top: 1px solid #ddd;
+            margin: 30px 0;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .metric-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #f9f9f9;
+            font-weight: bold;
+        }
+
+        .expander {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .expander-header {
+            padding: 15px;
+            cursor: pointer;
+            background: #f9f9f9;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .expander-header:hover {
+            background: #f0f0f0;
+        }
+
+        .expander-content {
+            display: none;
+            padding: 15px;
+        }
+
+        .expander-content.active {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+        }
+
+        .tab.active {
+            border-bottom: 3px solid #4CAF50;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .code-block {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .priority-high { color: #d32f2f; }
+        .priority-medium { color: #f57c00; }
+        .priority-low { color: #1976d2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>♿ EmpathAI: Accessibility Auditor Agent</h1>
+        <p class="subtitle">Enter a URL below. Your AI Agent will scan, analyze, and critique the accessibility.</p>
+
+        <div class="input-section">
+            <input type="text" id="urlInput" placeholder="https://example.com">
+            <button id="scanButton">🚀 Run Audit</button>
+        </div>
+
+        <div class="spinner" id="spinner">
+            🤖 Agent is visiting the website... (This may take 30 seconds)
+        </div>
+
+        <div id="errorContainer"></div>
+
+        <div class="results" id="results">
+            <div class="alert alert-success">Audit Complete!</div>
+
+            <h2>🤖 Executive Summary</h2>
+            <div class="alert alert-info" id="aiInsight"></div>
+
+            <div class="divider"></div>
+
+            <div class="metrics" id="metrics"></div>
+
+            <div class="divider"></div>
+
+            <h2>📊 Violation Overview</h2>
+            <div id="tableContainer"></div>
+
+            <h2>🛠️ Developer Action Plan</h2>
+            <p style="color: #666; margin-bottom: 20px;">Expand items below to see code snippets.</p>
+            <div id="expanderContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // Option 1: Direct call (requires backend CORS setup)
+        const API_URL = "https://empathai-backend.onrender.com/scan";
+        
+        // Option 2: Use CORS proxy (temporary solution, not for production)
+        // const API_URL = "https://cors-anywhere.herokuapp.com/https://empathai-backend.onrender.com/scan";
+        
+        // Option 3: Use another CORS proxy
+        // const API_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://empathai-backend.onrender.com/scan");
+
+        document.getElementById('scanButton').addEventListener('click', runAudit);
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') runAudit();
+        });
+
+        async function runAudit() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                showError('Please enter a URL');
+                return;
+            }
+
+            // Reset UI
+            document.getElementById('results').classList.remove('active');
+            document.getElementById('errorContainer').innerHTML = '';
+            document.getElementById('spinner').classList.add('active');
+            document.getElementById('scanButton').disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, wcag_level: 'AA' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        showError(`Scanner Error: ${data.error}`);
+                    } else {
+                        displayResults(data);
+                    }
+                } else {
+                    showError(`Server Error: ${response.status}`);
+                }
+            } catch (error) {
+                showError(`Connection Error: Is the backend running?\n\n${error.message}`);
+            } finally {
+                document.getElementById('spinner').classList.remove('active');
+                document.getElementById('scanButton').disabled = false;
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorContainer').innerHTML = 
+                `<div class="alert alert-error">${message}</div>`;
+        }
+
+        function displayResults(data) {
+            const report = data.report || {};
+            const aiInsight = data.ai_insight || 'No AI summary available.';
+            const issues = report.issues || [];
+            const stats = report.metadata?.severity_breakdown || {};
+            const total = report.metadata?.total_issues || 0;
+
+            // AI Insight
+            document.getElementById('aiInsight').textContent = aiInsight;
+
+            // Metrics
+            const metricsHTML = `
+                <div class="metric">
+                    <div class="metric-value">${total}</div>
+                    <div class="metric-label">Total Violations</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">🔥 ${stats.critical || 0}</div>
+                    <div class="metric-label">Critical</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">🔸 ${stats.serious || 0}</div>
+                    <div class="metric-label">Serious</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">🔹 ${stats.minor || 0}</div>
+                    <div class="metric-label">Minor</div>
+                </div>
+            `;
+            document.getElementById('metrics').innerHTML = metricsHTML;
+
+            if (issues.length > 0) {
+                // Table
+                let tableHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Priority</th>
+                                <th>Rule ID</th>
+                                <th>Issue Description</th>
+                                <th>Occurrences</th>
+                                <th>WCAG Criteria</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                issues.forEach(issue => {
+                    const priority = issue.fix_priority.includes('HIGH') ? '🔴 High' : 
+                                   issue.fix_priority.includes('MEDIUM') ? '🟠 Medium' : '🔵 Low';
+                    tableHTML += `
+                        <tr>
+                            <td>${priority}</td>
+                            <td>${issue.rule}</td>
+                            <td>${issue.description}</td>
+                            <td>${issue.total_occurrences}</td>
+                            <td>${issue.wcag}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHTML += '</tbody></table>';
+                document.getElementById('tableContainer').innerHTML = tableHTML;
+
+                // Expanders
+                let expanderHTML = '';
+                issues.forEach((issue, index) => {
+                    const priorityClass = issue.fix_priority.includes('HIGH') ? 'priority-high' : 
+                                        issue.fix_priority.includes('MEDIUM') ? 'priority-medium' : 'priority-low';
+                    
+                    let snippetsHTML = '';
+                    (issue.code_snippets || []).forEach((snippet, i) => {
+                        snippetsHTML += `
+                            <p><strong>Location ${i+1}:</strong> <code>${snippet.target || 'N/A'}</code></p>
+                            <div class="code-block">${escapeHtml(snippet.html || 'N/A')}</div>
+                            ${i < issue.code_snippets.length - 1 ? '<div class="divider"></div>' : ''}
+                        `;
+                    });
+
+                    expanderHTML += `
+                        <div class="expander">
+                            <div class="expander-header" onclick="toggleExpander(${index})">
+                                <span class="${priorityClass}">${issue.fix_priority} - ${issue.rule} (${issue.total_occurrences} issues)</span>
+                                <span id="arrow-${index}">▼</span>
+                            </div>
+                            <div class="expander-content" id="expander-${index}">
+                                <p><strong>Description:</strong> ${issue.description}</p>
+                                <p><strong>Compliance:</strong> WCAG ${issue.wcag}</p>
+                                <div class="tabs">
+                                    <button class="tab active" onclick="switchTab(${index}, 0)">📍 Locations & Code</button>
+                                    <button class="tab" onclick="switchTab(${index}, 1)">💡 AI Fix Advice</button>
+                                </div>
+                                <div class="tab-content active" id="tab-${index}-0">
+                                    ${snippetsHTML || '<p>No code snippets available.</p>'}
+                                </div>
+                                <div class="tab-content" id="tab-${index}-1">
+                                    <div class="alert alert-info">
+                                        Standard fix for <strong>${issue.rule}</strong>: Ensure elements comply with WCAG ${issue.wcag}. 
+                                        Check generic accessibility documentation for ${issue.rule}.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('expanderContainer').innerHTML = expanderHTML;
+            } else {
+                document.getElementById('tableContainer').innerHTML = 
+                    '<div class="alert alert-success">🎉 Perfect Score! No violations found.</div>';
+                document.getElementById('expanderContainer').innerHTML = '';
+            }
+
+            document.getElementById('results').classList.add('active');
+        }
+
+        function toggleExpander(index) {
+            const content = document.getElementById(`expander-${index}`);
+            const arrow = document.getElementById(`arrow-${index}`);
+            content.classList.toggle('active');
+            arrow.textContent = content.classList.contains('active') ? '▲' : '▼';
+        }
+
+        function switchTab(expanderIndex, tabIndex) {
+            const tabs = document.querySelectorAll(`#expander-${expanderIndex} .tab`);
+            const contents = document.querySelectorAll(`#expander-${expanderIndex} .tab-content`);
+            
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('active', i === tabIndex);
+            });
+            
+            contents.forEach((content, i) => {
+                content.classList.toggle('active', i === tabIndex);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

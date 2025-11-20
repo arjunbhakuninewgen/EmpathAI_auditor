@@ -4,7 +4,7 @@ import pandas as pd
 import json
 
 # --- CONFIGURATION ---
-API_URL = "http://localhost:8000/scan"
+API_URL = "https://empathai-backend.onrender.com/scan"
 
 st.set_page_config(page_title="EmpathAI Auditor", page_icon="♿", layout="wide")
 
