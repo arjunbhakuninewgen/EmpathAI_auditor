@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from orchestrator import OrchestratorAgent # <-- Import the agent
+from backend.orchestrator import OrchestratorAgent # <-- Add 'backend.'
 
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="EmpathAI WCAG Auditor")
