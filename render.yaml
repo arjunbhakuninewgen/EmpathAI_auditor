@@ -18,14 +18,15 @@ services:
   - type: web
     name: empathai-frontend
     runtime: python
+    region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt
     # Start Streamlit on the specific port Render assigns
-    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: API_URL
         # Internal Networking: The frontend talks to the backend directly via Render's private network
         # This is faster and more secure than using the public https URL
-        value: http://empathai-backend:8000/scan
+        value: https://empathai-backend.onrender.com/scan
