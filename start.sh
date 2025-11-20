@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# 1. Start the Backend in the background (&)
-# We run it on port 8000
+# 1. Start Backend (FastAPI) in background on fixed port 8000
+# We keep this internal. Only the frontend needs to talk to it.
 uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 
-# 2. Start the Frontend in the foreground
-# We run it on port 7860 (Standard for Hugging Face)
-streamlit run frontend/app.py --server.port 7860 --server.address 0.0.0.0
+# 2. Start Frontend (Streamlit) on the Railway-assigned PORT
+# Railway automatically sets the $PORT environment variable.
+streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
