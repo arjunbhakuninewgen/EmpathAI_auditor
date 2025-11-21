@@ -1,37 +1,87 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from backend.orchestrator import OrchestratorAgent # <-- Add 'backend.'
-
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-app = FastAPI(title="EmpathAI WCAG Auditor")
+from pydantic import BaseModel
+from typing import List, Optional
 
-# --- 2. ADD THIS MIDDLEWARE BLOCK ---
+from backend.tools.crawler import crawl_website
+from backend.graph.workflow import audit_graph
+
+app = FastAPI(title="EmpathAI v2.0 API")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows ALL domains (e.g., your local HTML file or Netlify)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows ALL methods (POST, GET, OPTIONS, etc.)
-    allow_headers=["*"],  # Allows ALL headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# 
-agent = OrchestratorAgent() # <-- Initialize the agent
 
-class ScanRequest(BaseModel):
+class CrawlRequest(BaseModel):
     url: str
-    wcag_level: str = "AA"
+    max_pages: int = 5
+
+class AuditRequest(BaseModel):
+    url: str
 
 @app.get("/")
 def home():
-    return {"message": "WCAG Agent is alive."}
+    return {"message": "EmpathAI v2.0 System is Online 🟢"}
 
-@app.post("/scan")
-async def scan_url(request: ScanRequest): # <-- Note 'async' here
-    print(f"Incoming Request: {request.url}")
+@app.post("/crawl")
+async def start_crawl(request: CrawlRequest):
+    print(f"🚀 API: Received crawl request for {request.url}")
+    try:
+        urls = await crawl_website(request.url, request.max_pages)
+        return {"urls": urls}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/audit")
+async def start_audit(request: AuditRequest):
+    print(f"🚀 API: Starting Deep Audit on {request.url}")
     
-    # Call the Orchestrator Agent
-    result = await agent.run_audit(request.url, request.wcag_level)
-    
-    return result
+    try:
+        initial_state = {"url": request.url}
+        final_state = await audit_graph.ainvoke(initial_state)
+        report = final_state.get("final_report", [])
+        
+        # --- NEW: Precise Calculation Logic ---
+        total = len(report)
+        critical = sum(1 for i in report if "HIGH" in i.get('fix_priority', ''))
+        serious = sum(1 for i in report if "MEDIUM" in i.get('fix_priority', ''))
+        minor = sum(1 for i in report if "LOW" in i.get('fix_priority', ''))
+        
+        # Determine Status Message
+        if critical > 0:
+            status = "❌ Non-Compliant"
+            reason = f"Failed due to {critical} Critical Issues"
+        elif serious > 0:
+            status = "⚠️ Needs Remediation"
+            reason = f"Has {serious} Serious Issues"
+        elif total > 0:
+            status = "⚠️ Minor Issues"
+            reason = "Usable, but needs polish"
+        else:
+            status = "✅ Compliant"
+            reason = "No WCAG violations found"
+
+        return {
+            "status": "success",
+            "url": request.url,
+            "summary": {
+                "status": status,
+                "reason": reason,
+                "total": total,
+                "critical": critical,
+                "serious": serious,
+                "minor": minor
+            },
+            "report": report
+        }
+
+    except Exception as e:
+        print(f"❌ API Graph Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

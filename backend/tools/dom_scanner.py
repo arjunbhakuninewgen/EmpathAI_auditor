@@ -16,7 +16,15 @@ async def scan_page(url: str):
 
             # Run Scan
             axe = Axe()
-            results = await axe.run(page)
+            
+            # EXPLICITLY request WCAG 2.1 AA rules
+            # This ensures we catch 1.3.4, 1.4.10, etc.
+            results = await axe.run(page, options={
+                "runOnly": {
+                    "type": "tag",
+                    "values": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+                }
+            })
             
             await browser.close()
             
