@@ -63,7 +63,14 @@ AXE_TO_WCAG = {
     
     # --- Media ---
     "video-caption": {"wcag": "1.2.2", "title": "Video Captions"},
-    "audio-caption": {"wcag": "1.2.2", "title": "Audio Captions"}
+    "audio-caption": {"wcag": "1.2.2", "title": "Audio Captions"},
+
+    # --- Best Practices & Structure ---
+    "page-has-heading-one": {"wcag": "Best Practice", "title": "Missing H1 Heading"},
+    "landmark-one-main": {"wcag": "Best Practice", "title": "Page must have one Main Landmark"},
+    "region": {"wcag": "Best Practice", "title": "All content must be in a Landmark Region"},
+    "meta-viewport": {"wcag": "1.4.4", "title": "Zooming must not be disabled"},
+    "scope-attr-valid": {"wcag": "1.3.1", "title": "Table headers must have scope"},
 }
 
 def map_to_wcag(raw_violations):
