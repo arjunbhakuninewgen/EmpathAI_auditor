@@ -1,0 +1,29 @@
+# Frontend Dockerfile: Next.js Dashboard (EmpathAI UI)
+
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files and install deps
+COPY empathy-frontend/package*.json ./
+RUN npm install
+
+# Copy full frontend source and build
+COPY empathy-frontend/ ./
+RUN npm run build
+
+# Runtime stage
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy only built assets + package.json
+COPY --from=builder /app ./
+
+# Expose port (Next will read PORT env, but this is for Docker metadata)
+EXPOSE 3000
+
+# Start Next.js in production mode
+CMD ["npm", "start"]

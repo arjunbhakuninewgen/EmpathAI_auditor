@@ -1,0 +1,27 @@
+# Backend Dockerfile: EmpathAI Auditor API
+# Uses official Playwright image (Python + browsers + deps)
+
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
+
+# Create working directory
+WORKDIR /app
+
+# Copy backend requirements and install
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY backend/ ./backend
+
+# Set backend as working directory
+WORKDIR /app/backend
+
+# Environment
+ENV PYTHONUNBUFFERED=1
+
+# Expose API port
+EXPOSE 8000
+
+# Start FastAPI app
+# (main.py defines app = FastAPI(...) and runs uvicorn if __main__)
+CMD ["python", "main.py"]
