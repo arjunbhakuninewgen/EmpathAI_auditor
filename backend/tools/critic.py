@@ -1,3 +1,5 @@
+# backend/tools/critic.py
+
 def critique_issues(issues):
     prioritized = []
     grouped = {}
@@ -12,13 +14,12 @@ def critique_issues(issues):
                 "wcag_sc": issue.get("wcag_sc", "Unknown"),
                 "fix_priority": issue.get("fix_priority", "LOW"),
                 "total_occurrences": 0,
-                "code_snippets": [] # <--- Container for code
+                "code_snippets": []  # <--- container for per-node HTML
             }
         
         grouped[rule_id]["total_occurrences"] += issue.get("nodes_affected", 1)
         
-        # --- CRITICAL FIX: COLLECT SNIPPETS ---
-        # Grab nodes passed from Mapper
+        # --- collect node-level snippets from wcag_mapper.enrich_with_wcag ---
         new_nodes = issue.get("specific_nodes", [])
         current_snippets = grouped[rule_id]["code_snippets"]
         

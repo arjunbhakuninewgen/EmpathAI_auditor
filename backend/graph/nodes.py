@@ -1,23 +1,26 @@
+# backend/graph/nodes.py
+
 import json
-import logging
 import os
-from typing import List, Dict, Any
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
 from dotenv import load_dotenv
 
-load_dotenv()
-
+# Import Tools
 from backend.tools.dom_scanner import scan_page
 from backend.tools.wcag_mapper import enrich_with_wcag
 from backend.tools.critic import critique_issues
 
-# Use a slightly higher temperature to allow creative fixes, but keep it structured
+load_dotenv()
+
 api_key = os.getenv("GOOGLE_API_KEY")
-text_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
-vision_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0, google_api_key=api_key)
+
+# --- CONFIGURATION ---
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite", 
+    temperature=0.2, 
+    google_api_key=api_key
+)
 
 # --- NODE 1: SCANNER ---
 async def scanner_node(state: dict) -> dict:
@@ -25,7 +28,10 @@ async def scanner_node(state: dict) -> dict:
     result = await scan_page(state["url"])
 
     if "error" in result:
-        return {"raw_violations": [], "screenshot_b64": None}
+        return {
+            "raw_violations": [], "screenshot_b64": None,
+            "dom_content": {}, "tab_log": []
+        }
 
     raw_list = result.get("violations", [])
     enriched = [enrich_with_wcag(v) for v in raw_list]
@@ -33,128 +39,254 @@ async def scanner_node(state: dict) -> dict:
     return {
         "raw_violations": enriched,
         "screenshot_b64": result.get("screenshot"),
+        "dom_content": result.get("dom_content", {}),
+        "tab_log": result.get("tab_log", [])
     }
 
 # --- NODE 2: CRITIC ---
 def critic_node(state: dict) -> dict:
+    """Group raw Axe violations, attach WCAG metadata and a representative HTML snippet.
+
+    This node:
+    - calls critic.critique_issues to group by rule
+    - marks all of these as category='syntax'
+    - exposes `html_snippet` and `selector` for the frontend & Fixer node
+    """
     issues = state.get("raw_violations", [])
     critiqued = critique_issues(issues)
-    print(f"📊 Critic Node: Grouped {len(issues)} raw into {len(critiqued)} unique issues.")
+
+    for c in critiqued:
+        # Tag the issue as a code/syntax issue
+        c["category"] = "syntax"
+
+        # If critic collected per-node details, expose the first one in a stable shape
+        snippets = c.get("code_snippets", [])
+        if snippets:
+            first = snippets[0]
+            c["html_snippet"] = first.get("html", "") or c.get("html_snippet", "")
+            c["selector"] = first.get("target", "") or c.get("selector", "")
+
+    print(f"📊 Critic Node: Grouped {len(issues)} raw into {len(critiqued)} unique syntax issues.")
     return {"critiqued_issues": critiqued}
 
-# --- NODE 3: VISION ---
+# --- NODE 3: SEMANTIC ANALYZER --------------------------------------
+# --- NODE 3: SEMANTIC ANALYZER --------------------------------------
+async def semantic_node(state: dict) -> dict:
+    print("🧠 Semantic Node → Analyzing Context & Meaning...")
+    content = state.get("dom_content", {})
+    links = content.get("links", [])
+    headings = content.get("headings", [])
+    
+    if not links and not headings:
+        print("⚠️ No semantic elements found")
+        return {"semantic_issues": []}
+
+    # STRONG JSON INSTRUCTION + STRICT FORMAT
+    prompt = f"""
+You are an expert in WCAG 2.4.4 (Link Purpose) and 2.4.6 (Headings & Labels).
+
+Analyze the following extracted page content:
+
+LINKS:
+{json.dumps(links[:20], indent=2)}
+
+HEADINGS:
+{json.dumps(headings[:20], indent=2)}
+
+Identify semantic accessibility issues such as:
+- Vague or contextless link text (“Click here”, “Learn more”)
+- Duplicate link text pointing to different destinations
+- Missing or skipped heading levels (H1 → H3 skip)
+- Headings used visually but not semantically
+- Headings that are empty or unclear
+
+Return ONLY valid JSON in this exact structure:
+
+{{
+    "issues": [
+        {{
+            "rule": "semantic-link" | "heading-structure" | "heading-empty",
+            "description": "Human-readable explanation",
+            "fix": "Specific recommended HTML/text fix"
+        }}
+    ]
+}}
+"""
+
+    try:
+        response = await llm.ainvoke(prompt)
+
+        raw = response.content.replace("```json", "").replace("```", "").strip()
+        print("🔍 RAW SEMANTIC RESPONSE:", raw)
+
+        data = json.loads(raw)
+
+        issues = []
+        for item in data.get("issues", []):
+            issues.append({
+                "rule": item.get("rule", "semantic-issue"),
+                "category": "semantic",
+                "description": item.get("description", "Semantic issue found."),
+                "fix_priority": "MEDIUM",
+                "wcag_sc": "2.4.4",
+                "html_snippet": "Semantic Analysis",
+                "ai_explanation": item.get("description"),
+                "ai_fixed_code": item.get("fix", "Update the text or structure.")
+            })
+
+        print(f"🧩 Semantic issues generated: {len(issues)}")
+        return {"semantic_issues": issues}
+
+    except Exception as e:
+        print("❌ SEMANTIC PARSE ERROR:", e)
+        return {"semantic_issues": []}
+
+# --- NODE 4: INTERACTION AGENT ---
+def interaction_node(state: dict) -> dict:
+    print("🤖 Interaction Node → Analyzing Keyboard Flow...")
+    log = state.get("tab_log", [])
+    issues = []
+    if not log: return {"interaction_issues": []}
+
+    body_focus = [item for item in log if item['tag'] == 'BODY']
+    if len(body_focus) > 1:
+        issues.append({
+            "rule": "keyboard-focus-lost",
+            "category": "interaction",
+            "fix_priority": "CRITICAL",
+            "wcag_sc": "2.4.7",
+            "description": "Focus lost to <body> tag.",
+            "html_snippet": "JS Focus Management",
+            "ai_explanation": "Focus indicator disappeared.",
+            "ai_fixed_code": "element.focus()"
+        })
+    return {"interaction_issues": issues}
+
+# --- NODE 5: VISION ANALYZER ---
 async def vision_analyzer_node(state: dict) -> dict:
     screenshot_b64 = state.get("screenshot_b64")
     if not screenshot_b64: return {"vision_issues": []}
 
-    prompt = """Analyze this website screenshot for Accessibility.
-    Identify visual issues like: Low contrast, Missing focus indicators, Small touch targets.
-    Return JSON: {"vision_issues": [{"title": "...", "severity": "critical", "explanation": "..."}]}"""
-
+    prompt = """
+    Analyze screenshot for WCAG violations (Contrast, Layout).
+    Return JSON: {"vision_issues": [{"description": "...", "explanation": "..."}]}
+    """
     try:
-        response = await vision_llm.ainvoke([
+        response = await llm.ainvoke([
             HumanMessage(content=[
                 {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": f"data:image/png;base64,{screenshot_b64}"}
             ])
         ])
-        # Cleaning response to ensure valid JSON
         content = response.content.replace("```json", "").replace("```", "").strip()
         data = json.loads(content)
         
         issues = []
         for i in data.get("vision_issues", []):
-            i.update({
-                "rule": "vision-ai",
-                "is_vision": True,
-                "fix_priority": "HIGH - Visual Issue",
-                "wcag_sc": "2.4.7 / 1.4.3",
-                "ai_fixed_code": "Visual issue - check CSS",
-                "html_snippet": "Detected from screenshot",
-                "selector": "Visual Element"
+            issues.append({
+                "rule": "visual-ai-scan",
+                "category": "visual",
+                "fix_priority": "HIGH",
+                "wcag_sc": "1.4.3",
+                "description": i.get("description"),
+                "html_snippet": "Visual Detection",
+                "ai_explanation": i.get("explanation"),
+                "ai_fixed_code": "Check CSS contrast/spacing."
             })
-            issues.append(i)
         return {"vision_issues": issues}
     except Exception:
         return {"vision_issues": []}
 
-# --- NODE 4: FIXER (ROBUST VERSION) ---
+# backend/graph/nodes.py (Only the fixer_node function needs update)
+# backend/graph/nodes.py (Only the fixer_node function needs update)
+# backend/graph/nodes.py (Only the fixer_node function needs update)
+
 async def fixer_node(state: dict) -> dict:
-    print("🔧 Fixer Node → Analyzing & Fixing...")
+    print("🔧 Fixer Node → Generating Solutions...")
     
-    issues = state.get("critiqued_issues", [])
-    vision = state.get("vision_issues", [])
+    # Get DOM Content for Reverse Lookup (for visual issues)
+    dom_content = state.get("dom_content", {})
+    interactive_elements = dom_content.get("interactive", [])
+    
+    all_issues = (
+        state.get("critiqued_issues", []) +
+        state.get("vision_issues", []) +
+        state.get("semantic_issues", []) +
+        state.get("interaction_issues", [])
+    )
     final_report = []
 
-    # Process ALL issues (Removed the limit so you see everything)
-    all_issues = issues + vision
 
-    for i, issue in enumerate(all_issues):
-        
-        # 1. EXTRACT DATA
-        snippets = issue.get("code_snippets", [])
-        if snippets and len(snippets) > 0:
-            bad_code = snippets[0].get("html", "Code not available")
-            selector = snippets[0].get("target", "Unknown Selector")
-        else:
-            bad_code = issue.get("html_snippet", "Code not available")
-            selector = issue.get("selector", "Unknown")
 
-        issue["html_snippet"] = bad_code
-        issue["selector"] = selector
+    print(f"   👉 Processing {len(all_issues)} total issues.")
 
-        # 2. SKIP CONDITIONS
-        if issue.get("is_vision") or bad_code == "Code not available":
+    for issue in all_issues:
+        # 1. Skip if already fixed
+        if issue.get("ai_fixed_code") and issue.get("ai_fixed_code") != "<!-- Fix -->":
             final_report.append(issue)
             continue
 
-        print(f"   👉 Generating AI fix for: {issue.get('rule')} ({i+1}/{len(all_issues)})")
+        rule = issue.get('rule', 'unknown')
+        desc = issue.get('description', '')
+        snippet = issue.get('html_snippet', '')
+        category = issue.get('category', '')
 
-        # 3. ROBUST AI PROMPT
-        # We explicitly tell Gemini to handle missing context gracefully
-        user_prompt = f"""
-        You are a Web Accessibility Expert.
+        # --- SMART LOOKUP FOR VISUAL ISSUES ---
+        # If it's a visual issue and we don't have code, try to find it by text
+        if category == 'visual' and (not snippet or "Visual Detection" in snippet):
+            # Try to find text inside single quotes '...' or just match the description
+            import re
+            match = re.search(r"'(.*?)'", desc)
+            search_text = match.group(1) if match else ""
+            
+            if search_text:
+                # Look for this text in our captured buttons/inputs
+                for el in interactive_elements:
+                    if search_text.lower() in el['text'].lower():
+                        snippet = el['html']
+                        issue['html_snippet'] = snippet # Update the issue object
+                        issue['selector'] = f"<{el['tag']}> containing '{search_text}'"
+                        print(f"   🎯 MATCH FOUND: Mapped visual issue to code: {snippet[:50]}...")
+                        break
+
+        # 3. Construct Prompt
+        has_code = snippet and snippet != "Code not available" and snippet != "Visual Detection"
         
-        VIOLATION:
-        Rule ID: {issue.get('rule')}
-        Description: {issue.get('description')}
-        
-        BAD CODE SNIPPET:
-        ```html
-        {bad_code}
-        ```
-        
-        TASK:
-        1. Explain WHY this fails WCAG in 1 simple sentence.
-        2. Provide the FIXED HTML code. If the tag is empty (like <button></button>), assume a logical fix (e.g., add aria-label or text).
-        
-        OUTPUT FORMAT (Strict JSON, no markdown):
-        {{
-            "explanation": "The button has no text, so screen readers cannot announce it.",
-            "fixed_code": "<button aria-label='Select Date'>...</button>"
-        }}
-        """
+        if not has_code:
+            user_prompt = f"""
+            You are an Accessibility Expert.
+            Violation: "{rule}" - "{desc}".
+            I cannot provide the exact code. Provide a general explanation and example fix.
+            Return JSON: {{ "explanation": "...", "fixed_code": "..." }}
+            """
+        else:
+            user_prompt = f"""
+            Fix this WCAG Violation.
+            Rule: {rule}
+            Description: {desc}
+            
+            BAD CODE SNIPPET:
+            {snippet}
+            
+            Task:
+            1. Explain why this is an issue.
+            2. Provide the FIXED HTML code (Add CSS styles inline if needed for contrast).
+            
+            Return JSON: {{ "explanation": "...", "fixed_code": "..." }}
+            """
         
         try:
-            # Direct generation (JsonOutputParser sometimes fails with Gemini)
-            # We will use basic invoke and clean the string manually for maximum stability
-            response = await text_llm.ainvoke(user_prompt)
-            
-            # Clean the string
+            response = await llm.ainvoke(user_prompt)
             clean_json = response.content.replace("```json", "").replace("```", "").strip()
             ai_data = json.loads(clean_json)
             
-            issue["ai_explanation"] = ai_data.get("explanation", "Fixed by AI")
-            issue["ai_fixed_code"] = ai_data.get("fixed_code", "<!-- Fixed Code -->")
-
+            issue["ai_explanation"] = ai_data.get("explanation", "AI Explanation")
+            issue["ai_fixed_code"] = ai_data.get("fixed_code", "<!-- Check CSS -->")
         except Exception as e:
-            print(f"❌ AI ERROR on {issue.get('rule')}: {str(e)}")
-            
-            # Fallback explanation so the UI is never empty
-            issue["ai_explanation"] = f"Error generating fix: {str(e)}. Please review WCAG guidelines manually."
-            issue["ai_fixed_code"] = "<!-- AI generation failed. Check server logs. -->"
+            print(f"❌ AI Fix Error on {rule}: {e}")
+            issue["ai_explanation"] = "Manual review recommended."
+            issue["ai_fixed_code"] = "<!-- Manual Review -->"
 
         final_report.append(issue)
 
-    print(f"📊 Fixer Node: Final Report has {len(final_report)} total issues.")
     return {"final_report": final_report}

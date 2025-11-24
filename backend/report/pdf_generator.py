@@ -5,7 +5,6 @@ from weasyprint import HTML
 from datetime import datetime
 import base64
 
-# Setup Jinja2
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
 env = Environment(loader=FileSystemLoader(template_dir))
 
@@ -16,18 +15,24 @@ def generate_pdf_report(report_data: dict, url: str) -> bytes:
     """
     template = env.get_template("report.html")
 
+    # Safe summary handling
+    summary = report_data.get("summary", {}) or {}
+    india_compliance = summary.get("india_compliance", "UNKNOWN")
+
     # Add metadata
     report_data.update({
         "url": url,
         "generated_at": datetime.now().strftime("%d %B %Y, %I:%M %p"),
         "total_issues": len(report_data.get("report", [])),
-        "india_compliant": report_data["summary"]["india_compliance"] == "PASS",
-        "empathai_version": "v2.0"
+        "india_compliant": india_compliance == "PASS",
+        "empathai_version": "v2.0",
     })
 
     html_content = template.render(report_data)
 
-    # Convert to PDF
-    pdf_bytes = HTML(string=html_content, base_url=os.path.dirname(__file__)).write_pdf()
+    pdf_bytes = HTML(
+        string=html_content,
+        base_url=os.path.dirname(__file__)
+    ).write_pdf()
 
     return pdf_bytes

@@ -50,7 +50,6 @@ WCAG_RULES = {
     "region":               {"sc": "Best", "level": "Best", "since": "2.1", "title": "Landmark Regions", "india_priority": "MEDIUM"},
 }
 
-
 def enrich_with_wcag(violation: dict) -> dict:
     rule_id = violation.get("id", "unknown")
     
@@ -60,11 +59,13 @@ def enrich_with_wcag(violation: dict) -> dict:
         "title": violation.get("help", rule_id), "india_priority": "LOW"
     })
 
-    # ... [Keep Priority Calculation Logic] ...
+    # You can keep/extend your priority calculation logic here
     india_priority = data.get("india_priority", "LOW")
     # ...
 
-    # --- CRITICAL FIX: PASS 'nodes' TO 'specific_nodes' ---
+    # --- CRITICAL: PASS 'nodes' TO 'specific_nodes' ---
+    # `dom_scanner` already normalized Axe nodes into:
+    #   { "html": "<button>Buy</button>", "target": "button.buy" }
     specific_nodes = violation.get("nodes", [])
     
     return {
@@ -72,7 +73,7 @@ def enrich_with_wcag(violation: dict) -> dict:
         "rule": rule_id,
         "wcag_sc": data.get("sc", "Unknown"),
         "wcag_title": data.get("title", "Accessibility Issue"),
-        "fix_priority": "HIGH" if india_priority == "CRITICAL" else "MEDIUM", # Simplified for brevity
-        "specific_nodes": specific_nodes, # <--- THIS MUST BE HERE
+        "fix_priority": "HIGH" if india_priority == "CRITICAL" else "MEDIUM",
+        "specific_nodes": specific_nodes,  # <--- used later by critic.py
         "india_priority": india_priority
     }
