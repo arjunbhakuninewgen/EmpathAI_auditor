@@ -1,135 +1,160 @@
-import os
 import json
-from typing import Dict, List
+import logging
+import os
+from typing import List, Dict, Any
+from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
+from dotenv import load_dotenv
 
-# Import your existing tools
+load_dotenv()
+
 from backend.tools.dom_scanner import scan_page
-from backend.tools.wcag_mapper import map_to_wcag
+from backend.tools.wcag_mapper import enrich_with_wcag
 from backend.tools.critic import critique_issues
-from backend.graph.state import AuditState
 
-# --- SETUP AI MODEL ---
+# Use a slightly higher temperature to allow creative fixes, but keep it structured
 api_key = os.getenv("GOOGLE_API_KEY")
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", 
-    google_api_key=api_key,
-    temperature=0
-)
+text_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
+vision_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.0, google_api_key=api_key)
 
-# --- NODE 1: THE SCANNER ---
-async def scanner_node(state: AuditState):
-    print(f"👀 NODE: Scanning {state['url']}...")
-    scan_result = await scan_page(state['url'])
-    
-    if isinstance(scan_result, dict) and "error" in scan_result:
+# --- NODE 1: SCANNER ---
+async def scanner_node(state: dict) -> dict:
+    print(f"👀 Scanner Node → Auditing {state['url']}")
+    result = await scan_page(state["url"])
+
+    if "error" in result:
         return {"raw_violations": [], "screenshot_b64": None}
-        
-    if isinstance(scan_result, list):
-        return {"raw_violations": scan_result, "screenshot_b64": None}
+
+    raw_list = result.get("violations", [])
+    enriched = [enrich_with_wcag(v) for v in raw_list]
     
     return {
-        "raw_violations": scan_result.get("violations", []),
-        "screenshot_b64": scan_result.get("screenshot")
+        "raw_violations": enriched,
+        "screenshot_b64": result.get("screenshot"),
     }
 
-# --- NODE 2: THE CRITIC ---
-def critic_node(state: AuditState):
-    print("⚖️ NODE: Critiquing & Prioritizing...")
-    raw = state.get("raw_violations", [])
-    mapped = map_to_wcag(raw)
-    critiqued = critique_issues(mapped)
+# --- NODE 2: CRITIC ---
+def critic_node(state: dict) -> dict:
+    issues = state.get("raw_violations", [])
+    critiqued = critique_issues(issues)
+    print(f"📊 Critic Node: Grouped {len(issues)} raw into {len(critiqued)} unique issues.")
     return {"critiqued_issues": critiqued}
 
-# --- NODE 3: THE FIXER (UPDATED) ---
-async def fixer_node(state: AuditState):
-    print("🔧 NODE: Generating AI Fixes...")
+# --- NODE 3: VISION ---
+async def vision_analyzer_node(state: dict) -> dict:
+    screenshot_b64 = state.get("screenshot_b64")
+    if not screenshot_b64: return {"vision_issues": []}
+
+    prompt = """Analyze this website screenshot for Accessibility.
+    Identify visual issues like: Low contrast, Missing focus indicators, Small touch targets.
+    Return JSON: {"vision_issues": [{"title": "...", "severity": "critical", "explanation": "..."}]}"""
+
+    try:
+        response = await vision_llm.ainvoke([
+            HumanMessage(content=[
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": f"data:image/png;base64,{screenshot_b64}"}
+            ])
+        ])
+        # Cleaning response to ensure valid JSON
+        content = response.content.replace("```json", "").replace("```", "").strip()
+        data = json.loads(content)
+        
+        issues = []
+        for i in data.get("vision_issues", []):
+            i.update({
+                "rule": "vision-ai",
+                "is_vision": True,
+                "fix_priority": "HIGH - Visual Issue",
+                "wcag_sc": "2.4.7 / 1.4.3",
+                "ai_fixed_code": "Visual issue - check CSS",
+                "html_snippet": "Detected from screenshot",
+                "selector": "Visual Element"
+            })
+            issues.append(i)
+        return {"vision_issues": issues}
+    except Exception:
+        return {"vision_issues": []}
+
+# --- NODE 4: FIXER (ROBUST VERSION) ---
+async def fixer_node(state: dict) -> dict:
+    print("🔧 Fixer Node → Analyzing & Fixing...")
     
     issues = state.get("critiqued_issues", [])
+    vision = state.get("vision_issues", [])
     final_report = []
-    
-    # Process Top 5 issues
-    top_issues = issues[:5] 
-    
-    for issue in top_issues:
-        # 1. Extract the Code Snippets (The Missing Link)
-        snippets = issue.get("code_snippets", [])
-        
-        # Get the first occurrence to show in the UI
-        if snippets and len(snippets) > 0:
-            # Handle if snippet is a dict (new scanner) or object
-            first_snippet = snippets[0]
-            bad_code = first_snippet.get("html", "Code not available")
-            selector = first_snippet.get("target", "Unknown Selector")
-        else:
-            bad_code = "Code not available"
-            selector = "Unknown"
 
-        # 2. SAVE IT FOR THE FRONTEND (This fixes your bug)
+    # Process ALL issues (Removed the limit so you see everything)
+    all_issues = issues + vision
+
+    for i, issue in enumerate(all_issues):
+        
+        # 1. EXTRACT DATA
+        snippets = issue.get("code_snippets", [])
+        if snippets and len(snippets) > 0:
+            bad_code = snippets[0].get("html", "Code not available")
+            selector = snippets[0].get("target", "Unknown Selector")
+        else:
+            bad_code = issue.get("html_snippet", "Code not available")
+            selector = issue.get("selector", "Unknown")
+
         issue["html_snippet"] = bad_code
         issue["selector"] = selector
 
-        # Skip AI if no code
-        if bad_code == "Code not available":
-            issue["ai_explanation"] = "Code snippet unavailable."
-            issue["ai_fixed_code"] = "N/A"
+        # 2. SKIP CONDITIONS
+        if issue.get("is_vision") or bad_code == "Code not available":
             final_report.append(issue)
             continue
 
-        # 3. Generate AI Fix
-        prompt = ChatPromptTemplate.from_template("""
-        You are an Expert Web Accessibility Developer.
+        print(f"   👉 Generating AI fix for: {issue.get('rule')} ({i+1}/{len(all_issues)})")
+
+        # 3. ROBUST AI PROMPT
+        # We explicitly tell Gemini to handle missing context gracefully
+        user_prompt = f"""
+        You are a Web Accessibility Expert.
         
-        **The Problem:**
-        Rule: {rule}
-        WCAG Criteria: {wcag}
-        Bad HTML Code: 
+        VIOLATION:
+        Rule ID: {issue.get('rule')}
+        Description: {issue.get('description')}
+        
+        BAD CODE SNIPPET:
         ```html
         {bad_code}
         ```
         
-        **Your Task:**
-        1. Explain WHY this is an accessibility error in 1 sentence.
-        2. Provide the CORRECTED HTML code that fixes this specific issue.
+        TASK:
+        1. Explain WHY this fails WCAG in 1 simple sentence.
+        2. Provide the FIXED HTML code. If the tag is empty (like <button></button>), assume a logical fix (e.g., add aria-label or text).
         
-        **Output Format (JSON ONLY):**
+        OUTPUT FORMAT (Strict JSON, no markdown):
         {{
-            "explanation": "The image is missing an alt attribute...",
-            "fixed_code": "<img src='...' alt='...'>"
+            "explanation": "The button has no text, so screen readers cannot announce it.",
+            "fixed_code": "<button aria-label='Select Date'>...</button>"
         }}
-        """)
-        
-        chain = prompt | llm | JsonOutputParser()
+        """
         
         try:
-            ai_result = await chain.ainvoke({
-                "rule": issue.get("rule", "Unknown"),
-                "wcag": issue.get("wcag", "Unknown"),
-                "bad_code": bad_code
-            })
+            # Direct generation (JsonOutputParser sometimes fails with Gemini)
+            # We will use basic invoke and clean the string manually for maximum stability
+            response = await text_llm.ainvoke(user_prompt)
             
-            issue["ai_explanation"] = ai_result.get("explanation")
-            issue["ai_fixed_code"] = ai_result.get("fixed_code")
+            # Clean the string
+            clean_json = response.content.replace("```json", "").replace("```", "").strip()
+            ai_data = json.loads(clean_json)
             
+            issue["ai_explanation"] = ai_data.get("explanation", "Fixed by AI")
+            issue["ai_fixed_code"] = ai_data.get("fixed_code", "<!-- Fixed Code -->")
+
         except Exception as e:
-            print(f"⚠️ AI Fix Failed: {e}")
-            issue["ai_explanation"] = "AI could not generate a fix."
-            issue["ai_fixed_code"] = "Error generating code."
+            print(f"❌ AI ERROR on {issue.get('rule')}: {str(e)}")
             
+            # Fallback explanation so the UI is never empty
+            issue["ai_explanation"] = f"Error generating fix: {str(e)}. Please review WCAG guidelines manually."
+            issue["ai_fixed_code"] = "<!-- AI generation failed. Check server logs. -->"
+
         final_report.append(issue)
-    
-    # Add remaining issues (without AI fixes)
-    # We also need to ensure they have the display keys
-    for issue in issues[5:]:
-        snippets = issue.get("code_snippets", [])
-        if snippets:
-            issue["html_snippet"] = snippets[0].get("html", "Code not available")
-            issue["selector"] = snippets[0].get("target", "Unknown")
-        else:
-            issue["html_snippet"] = "Code not available"
-            issue["selector"] = "Unknown"
-        final_report.append(issue)
-    
+
+    print(f"📊 Fixer Node: Final Report has {len(final_report)} total issues.")
     return {"final_report": final_report}

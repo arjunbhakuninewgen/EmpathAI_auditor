@@ -1,29 +1,37 @@
-from typing import List, TypedDict, Optional
+# backend/graph/state.py
+from typing import List, Dict, Any, Optional
+from typing_extensions import TypedDict
 
-# 1. Define the structure of a single "Issue"
-class AccessibilityIssue(TypedDict):
-    rule_id: str
+# Single issue (shared format)
+class AccessibilityIssue(TypedDict, total=False):
+    rule: str
     description: str
     impact: str
-    wcag: str
+    wcag_sc: str
+    wcag_title: str
     selector: str
     html_snippet: str
     fix_priority: str
-    
-    # The Fixer Agent will add these fields later:
+    is_vision: bool
+    version_badge: str
     ai_explanation: Optional[str]
     ai_fixed_code: Optional[str]
+    india_priority: Optional[str]
+    learn_more: Optional[str]
 
-# 2. Define the Graph State (The Shared Memory)
+
+# Main graph state
 class AuditState(TypedDict):
     url: str
     screenshot_b64: Optional[str]
-    
-    # Step 1: Raw data from Scanner
-    raw_violations: List[dict] 
-    
-    # Step 2: Filtered & Prioritized by Critic
+    page_title: Optional[str]
+
+    # Scanner → Critic
+    raw_violations: List[Dict[Any, Any]]
     critiqued_issues: List[AccessibilityIssue]
-    
-    # Step 3: Solved by Fixer (Final Output)
+
+    # Vision Analyzer
+    vision_issues: List[AccessibilityIssue]
+
+    # Final output
     final_report: List[AccessibilityIssue]

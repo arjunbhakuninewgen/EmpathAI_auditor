@@ -1,51 +1,29 @@
 def critique_issues(issues):
-    """
-    Analyzes the list of issues and prioritizes them.
-    Returns a cleaner, prioritized list.
-    """
     prioritized = []
-    
-    # 1. Group by Rule ID (deduplication)
     grouped = {}
+    
     for issue in issues:
-        # --- FIX: Handle both 'rule' and 'rule_id' keys safely ---
-        rule = issue.get("rule") or issue.get("rule_id") or "unknown-rule"
+        rule_id = issue.get("rule", "unknown")
         
-        if rule not in grouped:
-            grouped[rule] = {
-                "rule": rule,
-                "impact": issue.get("impact", "minor"),
-                "wcag": issue.get("wcag", "Best Practice"),
-                "description": issue.get("description", "General Issue"),
+        if rule_id not in grouped:
+            grouped[rule_id] = {
+                "rule": rule_id,
+                "description": issue.get("description", ""),
+                "wcag_sc": issue.get("wcag_sc", "Unknown"),
+                "fix_priority": issue.get("fix_priority", "LOW"),
                 "total_occurrences": 0,
-                "fix_priority": "Low",
-                "code_snippets": [] 
+                "code_snippets": [] # <--- Container for code
             }
         
-        # Sum the counts
-        grouped[rule]["total_occurrences"] += issue.get("nodes_affected", 1)
+        grouped[rule_id]["total_occurrences"] += issue.get("nodes_affected", 1)
         
-        # Collect the code snippets (Limit to first 5 to avoid huge JSON)
-        if len(grouped[rule]["code_snippets"]) < 5:
-            # Handle specific_nodes list
-            nodes = issue.get("specific_nodes", [])
-            grouped[rule]["code_snippets"].extend(nodes)
-
-    # 2. Assign Priority Logic (Rule-based AI)
-    for rule_id, data in grouped.items():
-        impact = data["impact"]
+        # --- CRITICAL FIX: COLLECT SNIPPETS ---
+        # Grab nodes passed from Mapper
+        new_nodes = issue.get("specific_nodes", [])
+        current_snippets = grouped[rule_id]["code_snippets"]
         
-        # Critical impact or WCAG A level gets High priority
-        if impact == 'critical':
-            data["fix_priority"] = "🔥 HIGH - Fix Immediately"
-        elif impact == 'serious':
-            data["fix_priority"] = "🔸 MEDIUM - Fix Next"
-        else:
-            data["fix_priority"] = "🔹 LOW - Backlog"
+        # Only keep top 5 snippets to avoid huge payloads
+        if len(current_snippets) < 5:
+            current_snippets.extend(new_nodes)
             
-        prioritized.append(data)
-
-    # 3. Sort by Priority (High -> Low)
-    prioritized.sort(key=lambda x: x["fix_priority"], reverse=True)
-    
-    return prioritized
+    return list(grouped.values())

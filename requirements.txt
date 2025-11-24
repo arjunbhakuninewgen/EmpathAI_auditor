@@ -1,21 +1,14 @@
 fastapi==0.121.2
-uvicorn==0.38.0
-streamlit==1.51.0
-requests==2.32.5
-pandas==2.3.3
+uvicorn[standard]==0.38.0
 playwright==1.48.0
 axe-playwright-python==0.1.6
-python-dotenv==1.0.1
+langchain-core==0.2.41
+langchain==0.2.16
+langchain-google-genai==1.0.10
+langgraph==0.2.5
 pydantic==2.11.10
 python-multipart
-beautifulsoup4
-
-# --- STABLE AI STACK ---
-# We keep these pinned to <0.3.0 to avoid the pydantic error
-langchain-core<0.3.0
-langchain<0.3.0
-langchain-google-genai<2.0.0
-langgraph<0.3.0
-
-# We REMOVED the specific google-generativeai version.
-# Pip will now automatically install version 0.7.2 (which works).
+python-dotenv
+pillow
+weasyprint==62.1
+jinja2==3.1.4

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>EmpathAI v2.0 Accessibility Report</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 40px; background: #f8fafc; color: #1e293b; }
+    .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 30px; border-radius: 16px; text-align: center; }
+    .badge { padding: 8px 16px; border-radius: 50px; font-weight: bold; font-size: 14px; }
+    .pass { background: #10b981; color: white; }
+    .fail { background: #ef4444; color: white; }
+    .section { margin: 30px 0; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; }
+    td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .priority-critical { background: #fee2e2; color: #991b1b; font-weight: bold; }
+    .priority-high { background: #ffedd5; color: #9a3412; }
+    .vision { background: #f3e8ff; border-left: 5px solid #a855f7; }
+    .code { background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 8px; font-family: 'Courier New'; font-size: 13px; overflow-x: auto; }
+    .logo { font-size: 36px; font-weight: bold; }
+    .footer { text-align: center; margin-top: 60px; color: #64748b; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1 class="logo">EmpathAI v2.0</h1>
+  <p>Autonomous AI Accessibility Auditor • Made in India</p>
+  <h2>Accessibility Report</h2>
+  <p><strong>{{ url }}</strong></p>
+  <p>Generated on {{ generated_at }}</p>
+</div>
+
+<div class="section">
+  <h2>Compliance Summary</h2>
+  <p>
+    <strong>WCAG 2.2 AA Compliance:</strong>
+    {% if summary.india_compliance == "PASS" %}
+      <span class="badge pass">PASS</span>
+    {% else %}
+      <span class="badge fail">FAIL</span>
+    {% endif %}
+  </p>
+  <p><strong>Indian Law (RPwD Act + IS 17802):</strong> {{ summary.india_message }}</p>
+  <p><strong>Total Issues Found:</strong> {{ total_issues }}</p>
+</div>
+
+<div class="section">
+  <h2>Detailed Issues</h2>
+  <table>
+    <tr>
+      <th>Issue</th>
+      <th>WCAG</th>
+      <th>Priority</th>
+      <th>AI Explanation</th>
+      <th>Fix</th>
+    </tr>
+    {% for issue in report %}
+    <tr class="{% if 'CRITICAL' in issue.fix_priority %}priority-critical{% elif 'HIGH' in issue.fix_priority %}priority-high{% endif %} {% if issue.is_vision %}vision{% endif %}">
+      <td>
+        <strong>{{ issue.description }}</strong><br>
+        {% if issue.is_vision %}<em>(Detected by AI Vision)</em>{% endif %}
+      </td>
+      <td>{{ issue.wcag_sc or "N/A" }}</td>
+      <td>{{ issue.fix_priority }}</td>
+      <td>{{ issue.ai_explanation or "No explanation" }}</td>
+      <td>
+        {% if issue.ai_fixed_code and issue.ai_fixed_code != "Manual fix required" %}
+          <div class="code">{{ issue.ai_fixed_code }}</div>
+        {% else %}
+          <em>Manual fix required</em>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="footer">
+  <p>EmpathAI v2.
+
+0 • Powered by Gemini 1.5 Flash • Built for Indian Digital Accessibility</p>
+  <p>© 2025 • All rights reserved</p>
+</div>
+
+</body>
+</html>
