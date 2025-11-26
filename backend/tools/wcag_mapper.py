@@ -50,6 +50,21 @@ WCAG_RULES = {
     "region":               {"sc": "Best", "level": "Best", "since": "2.1", "title": "Landmark Regions", "india_priority": "MEDIUM"},
 }
 
+# --- GIGW 3.0 MAPPING (India Specific) ---
+# Guidelines for Indian Government Websites 3.0
+GIGW_MAPPING = {
+    "1.1.1": "9.1.1 (Non-text Content)",
+    "1.3.1": "9.1.3 (Info and Relationships)",
+    "1.4.3": "9.1.4 (Contrast Minimum)",
+    "2.1.1": "9.2.1 (Keyboard)",
+    "2.4.1": "9.2.4 (Bypass Blocks)",
+    "2.4.2": "9.2.4 (Page Titled)",
+    "2.4.4": "9.2.4 (Link Purpose)",
+    "3.1.1": "9.3.1 (Language of Page)",
+    "3.3.2": "9.3.3 (Labels or Instructions)",
+    "4.1.2": "9.4.1 (Name, Role, Value)"
+}
+
 def enrich_with_wcag(violation: dict) -> dict:
     rule_id = violation.get("id", "unknown")
     
@@ -68,11 +83,16 @@ def enrich_with_wcag(violation: dict) -> dict:
     #   { "html": "<button>Buy</button>", "target": "button.buy" }
     specific_nodes = violation.get("nodes", [])
     
+    # --- GIGW 3.0 ENRICHMENT ---
+    wcag_sc = data.get("sc", "Unknown")
+    gigw_checkpoint = GIGW_MAPPING.get(wcag_sc, "N/A - Best Practice")
+
     return {
         **violation,
         "rule": rule_id,
-        "wcag_sc": data.get("sc", "Unknown"),
+        "wcag_sc": wcag_sc,
         "wcag_title": data.get("title", "Accessibility Issue"),
+        "gigw_checkpoint": gigw_checkpoint, # New GIGW field
         "fix_priority": "HIGH" if india_priority == "CRITICAL" else "MEDIUM",
         "specific_nodes": specific_nodes,  # <--- used later by critic.py
         "india_priority": india_priority

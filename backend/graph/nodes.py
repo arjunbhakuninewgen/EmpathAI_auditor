@@ -10,20 +10,35 @@ from dotenv import load_dotenv
 from backend.tools.dom_scanner import scan_page
 from backend.tools.wcag_mapper import enrich_with_wcag
 from backend.tools.critic import critique_issues
+from backend.guardrails.input_guard import validate_input
+from backend.guardrails.output_guard import validate_fix
+from backend.slm.fast_critic import fast_critique
+# from backend.dpi.bhashini import translate_text # New DPI Service - COMMENTED OUT FOR NOW
 
 load_dotenv()
 
 api_key = os.getenv("GOOGLE_API_KEY")
 
 # --- CONFIGURATION ---
+# Force REST transport to avoid SSL/gRPC issues with corporate proxies
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", 
+    model="gemini-2.0-flash-exp", 
     temperature=0.2, 
-    google_api_key=api_key
+    google_api_key=api_key,
+    transport="rest"  # Use REST instead of gRPC to avoid SSL certificate issues
 )
+
+# --- NODE 0: INPUT GUARD ---
+def input_guard_node(state: dict) -> dict:
+    return validate_input(state)
 
 # --- NODE 1: SCANNER ---
 async def scanner_node(state: dict) -> dict:
+    # Check for upstream errors
+    if "error" in state:
+        print(f"⛔ Scanner skipped due to input error: {state['error']}")
+        return {"error": state["error"]}
+
     print(f"👀 Scanner Node → Auditing {state['url']}")
     result = await scan_page(state["url"])
 
@@ -53,6 +68,11 @@ def critic_node(state: dict) -> dict:
     - exposes `html_snippet` and `selector` for the frontend & Fixer node
     """
     issues = state.get("raw_violations", [])
+    
+    # --- SLM LAYER ---
+    issues = fast_critique(issues)
+    # -----------------
+
     critiqued = critique_issues(issues)
 
     for c in critiqued:
@@ -69,7 +89,6 @@ def critic_node(state: dict) -> dict:
     print(f"📊 Critic Node: Grouped {len(issues)} raw into {len(critiqued)} unique syntax issues.")
     return {"critiqued_issues": critiqued}
 
-# --- NODE 3: SEMANTIC ANALYZER --------------------------------------
 # --- NODE 3: SEMANTIC ANALYZER --------------------------------------
 async def semantic_node(state: dict) -> dict:
     print("🧠 Semantic Node → Analyzing Context & Meaning...")
@@ -94,7 +113,7 @@ HEADINGS:
 {json.dumps(headings[:20], indent=2)}
 
 Identify semantic accessibility issues such as:
-- Vague or contextless link text (“Click here”, “Learn more”)
+- Vague or contextless link text ("Click here", "Learn more")
 - Duplicate link text pointing to different destinations
 - Missing or skipped heading levels (H1 → H3 skip)
 - Headings used visually but not semantically
@@ -197,10 +216,7 @@ async def vision_analyzer_node(state: dict) -> dict:
     except Exception:
         return {"vision_issues": []}
 
-# backend/graph/nodes.py (Only the fixer_node function needs update)
-# backend/graph/nodes.py (Only the fixer_node function needs update)
-# backend/graph/nodes.py (Only the fixer_node function needs update)
-
+# --- NODE 6: FIXER ---
 async def fixer_node(state: dict) -> dict:
     print("🔧 Fixer Node → Generating Solutions...")
     
@@ -215,8 +231,6 @@ async def fixer_node(state: dict) -> dict:
         state.get("interaction_issues", [])
     )
     final_report = []
-
-
 
     print(f"   👉 Processing {len(all_issues)} total issues.")
 
@@ -281,7 +295,17 @@ async def fixer_node(state: dict) -> dict:
             ai_data = json.loads(clean_json)
             
             issue["ai_explanation"] = ai_data.get("explanation", "AI Explanation")
-            issue["ai_fixed_code"] = ai_data.get("fixed_code", "<!-- Check CSS -->")
+            
+            # --- OUTPUT GUARD ---
+            raw_fix = ai_data.get("fixed_code", "<!-- Check CSS -->")
+            issue["ai_fixed_code"] = validate_fix(raw_fix)
+            # --------------------
+
+            # --- DPI: BHASHINI TRANSLATION (COMMENTED OUT FOR NOW) ---
+            # Translate the explanation to Hindi (Official Language)
+            # issue["hindi_explanation"] = translate_text(issue["ai_explanation"], "hi")
+            # ---------------------------------
+            
         except Exception as e:
             print(f"❌ AI Fix Error on {rule}: {e}")
             issue["ai_explanation"] = "Manual review recommended."
