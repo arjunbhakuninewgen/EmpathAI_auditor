@@ -347,10 +347,8 @@ Distributed under the MIT License. See `LICENSE` for details.
 
 ## 📧 Contact
 
-**Project Maintainer**: [Your Name]  
-**Email**: [your.email@example.com]  
-**LinkedIn**: [Your LinkedIn]  
-**GitHub**: [@yourusername](https://github.com/yourusername)
+**Project Maintainer**: Arjun Singh
+
 
 ---
 
