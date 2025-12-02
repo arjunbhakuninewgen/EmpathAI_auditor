@@ -22,7 +22,7 @@ api_key = os.getenv("GOOGLE_API_KEY")
 # --- CONFIGURATION ---
 # Force REST transport to avoid SSL/gRPC issues with corporate proxies
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-exp", 
+    model="gemini-2.5-pro", 
     temperature=0.2, 
     google_api_key=api_key,
     transport="rest"  # Use REST instead of gRPC to avoid SSL certificate issues
@@ -59,7 +59,7 @@ async def scanner_node(state: dict) -> dict:
     }
 
 # --- NODE 2: CRITIC ---
-def critic_node(state: dict) -> dict:
+async def critic_node(state: dict) -> dict:
     """Group raw Axe violations, attach WCAG metadata and a representative HTML snippet.
 
     This node:
@@ -69,9 +69,9 @@ def critic_node(state: dict) -> dict:
     """
     issues = state.get("raw_violations", [])
     
-    # --- SLM LAYER ---
-    issues = fast_critique(issues)
-    # -----------------
+    # --- HYBRID SLM LAYER (Tier 1: Heuristic + Tier 2: Model-based) ---
+    issues = await fast_critique(issues)
+    # ------------------------------------------------------------------
 
     critiqued = critique_issues(issues)
 
@@ -133,7 +133,7 @@ Return ONLY valid JSON in this exact structure:
 """
 
     try:
-        response = await llm.ainvoke(prompt)
+        response = llm.invoke(prompt)  # Changed from ainvoke to invoke
 
         raw = response.content.replace("```json", "").replace("```", "").strip()
         print("🔍 RAW SEMANTIC RESPONSE:", raw)
@@ -191,7 +191,7 @@ async def vision_analyzer_node(state: dict) -> dict:
     Return JSON: {"vision_issues": [{"description": "...", "explanation": "..."}]}
     """
     try:
-        response = await llm.ainvoke([
+        response = llm.invoke([  # Changed from ainvoke to invoke
             HumanMessage(content=[
                 {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": f"data:image/png;base64,{screenshot_b64}"}
@@ -290,7 +290,7 @@ async def fixer_node(state: dict) -> dict:
             """
         
         try:
-            response = await llm.ainvoke(user_prompt)
+            response = llm.invoke(user_prompt)  # Changed from ainvoke to invoke
             clean_json = response.content.replace("```json", "").replace("```", "").strip()
             ai_data = json.loads(clean_json)
             

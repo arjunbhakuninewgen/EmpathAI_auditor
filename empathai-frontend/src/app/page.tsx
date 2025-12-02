@@ -73,7 +73,7 @@ interface AuditData {
 export default function Home() {
   // State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [url, setUrl] = useState("https://dequeuniversity.com/demo/mars/");
+  const [url, setUrl] = useState("");
   const [crawledPages, setCrawledPages] = useState<string[]>([]);
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [auditResults, setAuditResults] = useState<Record<string, AuditData>>(
@@ -151,7 +151,7 @@ export default function Home() {
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-xl tracking-tight">
-              EmpathAI v3.0
+              Ay11Sutra
             </span>
             <Badge
               variant="outline"

@@ -72,21 +72,6 @@ graph LR
 - Ensures government portals comply with IS 17802 standards
 - Active in `backend/tools/wcag_mapper.py`
 
-### 🌐 **Bhashini Integration (Planned - Phase 2)**
-- Translates accessibility reports to 22 Indic languages (Hindi, Tamil, Telugu, etc.)
-- Architecture ready in `backend/dpi/bhashini.py`
-- Awaiting Bhashini API key for production
-
-### ⚡ **SLM Fast Critic**
-- Heuristic-based pre-filtering reduces false positives
-- Filters out minor contrast issues and noise (e.g., `region` rule violations)
-- Reduces LLM API costs by 30%
-
-### 🎨 **Multimodal Vision Analysis**
-- Screenshot-based contrast detection
-- Layout analysis using Gemini Vision API
-- Identifies visual issues missed by DOM scanners
-
 ---
 
 ## 🛠️ Tech Stack
@@ -270,22 +255,6 @@ EmpathAI maps generic WCAG violations to **Indian government standards**:
 |---------|----------------|-------------|
 | 1.1.1 | 9.1.1 | Non-text Content |
 | 1.4.3 | 9.1.4 | Contrast (Minimum) |
-| 2.4.1 | 9.2.4 | Bypass Blocks |
-| 4.1.2 | 9.4.1 | Name, Role, Value |
-
-**Implementation**: `backend/tools/wcag_mapper.py`
-
-### Bhashini Integration (Phase 2 - Planned)
-
-- **Purpose**: Translate accessibility reports to Indic languages
-- **Languages**: Hindi, Tamil, Telugu, Bengali, Marathi (22 total)
-- **API**: `https://dhruva-api.bhashini.gov.in/services/inference/translation`
-- **Status**: Architecture ready, awaiting API key
-
----
-
-## 🎯 Use Cases
-
 1. **Government Portals**: GIGW 3.0 compliance audits for ministry websites
 2. **ONDC Buyer Apps**: Accessibility validation for e-commerce platforms
 3. **CI/CD Integration**: Automated accessibility testing in deployment pipelines
