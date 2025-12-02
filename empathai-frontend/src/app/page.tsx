@@ -127,9 +127,15 @@ export default function Home() {
         results[page] = data;
       } catch (err) {
         console.error(err);
-        // @ts-ignore
         results[page] = {
-          summary: {},
+          summary: {
+            total: 0,
+            critical: 0,
+            serious: 0,
+            minor: 0,
+            india_compliance: "N/A",
+            status: "Error",
+          },
           report: [],
           error: "Failed to audit page",
         };

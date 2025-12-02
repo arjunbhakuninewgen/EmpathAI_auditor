@@ -165,20 +165,76 @@ def interaction_node(state: dict) -> dict:
     print("🤖 Interaction Node → Analyzing Keyboard Flow...")
     log = state.get("tab_log", [])
     issues = []
-    if not log: return {"interaction_issues": []}
-
-    body_focus = [item for item in log if item['tag'] == 'BODY']
+    
+    if not log:
+        print("⚠️ No keyboard interaction log found")
+        return {"interaction_issues": []}
+    
+    print(f"🔍 DEBUG: Analyzing {len(log)} keyboard interactions")
+    
+    # Issue 1: Focus lost to <body> tag (focus trap)
+    body_focus = [item for item in log if item.get('tag') == 'BODY']
     if len(body_focus) > 1:
         issues.append({
             "rule": "keyboard-focus-lost",
             "category": "interaction",
             "fix_priority": "CRITICAL",
             "wcag_sc": "2.4.7",
-            "description": "Focus lost to <body> tag.",
-            "html_snippet": "JS Focus Management",
-            "ai_explanation": "Focus indicator disappeared.",
-            "ai_fixed_code": "element.focus()"
+            "description": f"Focus lost to <body> tag {len(body_focus)} times during keyboard navigation. This indicates a focus trap or missing focus management.",
+            "html_snippet": "Focus management issue detected",
+            "ai_explanation": "When users press Tab, focus should move to the next interactive element. If focus jumps to <body>, users lose track of where they are on the page.",
+            "ai_fixed_code": "Ensure all interactive elements are keyboard accessible. Add tabindex='0' to custom interactive elements or use semantic HTML like <button> instead of <div>."
         })
+    
+    # Issue 2: Non-interactive elements receiving focus
+    non_interactive_tags = ['DIV', 'SPAN', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']
+    non_interactive_focused = [item for item in log if item.get('tag') in non_interactive_tags]
+    
+    if non_interactive_focused:
+        issues.append({
+            "rule": "non-interactive-tabindex",
+            "category": "interaction",
+            "fix_priority": "MEDIUM",
+            "wcag_sc": "2.4.3",
+            "description": f"Found {len(non_interactive_focused)} non-interactive elements with keyboard focus, which can confuse keyboard users.",
+            "html_snippet": f"<{non_interactive_focused[0].get('tag')} tabindex='...'>",
+            "ai_explanation": "Non-interactive elements (div, span, p) should not receive keyboard focus unless they have an interactive role.",
+            "ai_fixed_code": "Remove tabindex from non-interactive elements or add appropriate ARIA roles like role='button' if they are meant to be interactive."
+        })
+    
+    # Issue 3: Very short tab sequence (might indicate missing keyboard access)
+    if len(log) < 5:
+        issues.append({
+            "rule": "limited-keyboard-access",
+            "category": "interaction",
+            "fix_priority": "HIGH",
+            "wcag_sc": "2.1.1",
+            "description": f"Only {len(log)} elements are keyboard accessible. This page may have insufficient keyboard navigation.",
+            "html_snippet": "Page-wide keyboard accessibility issue",
+            "ai_explanation": "A typical page should have many focusable elements (links, buttons, form inputs). Very few focusable elements suggests missing keyboard access.",
+            "ai_fixed_code": "Ensure all interactive elements (buttons, links, form controls) are keyboard accessible. Avoid using <div> or <span> for interactive elements without proper tabindex and ARIA roles."
+        })
+    
+    # Issue 4: Duplicate IDs in focusable elements
+    ids_seen = {}
+    for item in log:
+        elem_id = item.get('id')
+        if elem_id:
+            if elem_id in ids_seen:
+                issues.append({
+                    "rule": "duplicate-id-focusable",
+                    "category": "interaction",
+                    "fix_priority": "CRITICAL",
+                    "wcag_sc": "4.1.1",
+                    "description": f"Duplicate ID '{elem_id}' found on focusable elements. This breaks assistive technology.",
+                    "html_snippet": f"<... id='{elem_id}'>",
+                    "ai_explanation": "IDs must be unique on a page. Duplicate IDs on focusable elements confuse screen readers and keyboard navigation.",
+                    "ai_fixed_code": f"Change one of the elements to use a unique ID, e.g., id='{elem_id}-2'"
+                })
+                break  # Only report once
+            ids_seen[elem_id] = True
+    
+    print(f"🎯 Interaction issues found: {len(issues)}")
     return {"interaction_issues": issues}
 
 # --- NODE 5: VISION ANALYZER ---
