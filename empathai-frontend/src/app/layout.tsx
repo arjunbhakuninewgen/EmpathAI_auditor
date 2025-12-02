@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ay11Sutra - AI-Powered Accessibility Auditor",
+  title: "A11ySutra - AI-Powered Accessibility Auditor",
   description: "Autonomous accessibility auditing with AI-powered fixes for WCAG & GIGW 3.0 compliance",
 };
 
@@ -26,6 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         {children}
       </body>

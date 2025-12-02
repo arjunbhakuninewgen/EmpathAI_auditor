@@ -157,7 +157,7 @@ export default function Home() {
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-xl tracking-tight">
-              Ay11Sutra
+              A11ySutra
             </span>
             <Badge
               variant="outline"
