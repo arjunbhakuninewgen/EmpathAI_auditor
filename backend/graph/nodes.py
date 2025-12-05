@@ -22,8 +22,8 @@ api_key = os.getenv("GOOGLE_API_KEY")
 # --- CONFIGURATION ---
 # Force REST transport to avoid SSL/gRPC issues with corporate proxies
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-pro", 
-    temperature=0.2, 
+    model="gemini-2.0-flash-lite", 
+    temperature=0, 
     google_api_key=api_key,
     transport="rest"  # Use REST instead of gRPC to avoid SSL certificate issues
 )
@@ -113,7 +113,7 @@ HEADINGS:
 {json.dumps(headings[:20], indent=2)}
 
 Identify semantic accessibility issues such as:
-- Vague or contextless link text ("Click here", "Learn more")
+- Vague or contextless link text ("Click here", "Learn more", "No Text")
 - Duplicate link text pointing to different destinations
 - Missing or skipped heading levels (H1 → H3 skip)
 - Headings used visually but not semantically
@@ -126,7 +126,9 @@ Return ONLY valid JSON in this exact structure:
         {{
             "rule": "semantic-link" | "heading-structure" | "heading-empty",
             "description": "Human-readable explanation",
-            "fix": "Specific recommended HTML/text fix"
+            "fix": "Specific recommended HTML/text fix",
+            "selector": "The selector from the input data",
+            "html_snippet": "The HTML snippet from the input data"
         }}
     ]
 }}
@@ -148,7 +150,8 @@ Return ONLY valid JSON in this exact structure:
                 "description": item.get("description", "Semantic issue found."),
                 "fix_priority": "MEDIUM",
                 "wcag_sc": "2.4.4",
-                "html_snippet": "Semantic Analysis",
+                "html_snippet": item.get("html_snippet", "Semantic Analysis"),
+                "selector": item.get("selector", "N/A"),
                 "ai_explanation": item.get("description"),
                 "ai_fixed_code": item.get("fix", "Update the text or structure.")
             })

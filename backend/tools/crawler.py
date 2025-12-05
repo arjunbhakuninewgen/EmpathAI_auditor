@@ -9,16 +9,19 @@ IGNORED_EXTENSIONS = [
     '.zip', '.tar', '.gz', '.woff', '.woff2', '.ttf', '.eot'
 ]
 
-async def crawl_website(start_url: str, max_pages: int = 10):
+async def crawl_website(start_url: str, max_pages: int = 50):
     """
     Crawls a website using a real browser (Playwright) to find internal links.
     Works for both Static HTML and Modern JS Frameworks (React, Vue, etc).
+    
+    QA Fix: Normalizes www vs non-www domains to ensure consistent crawling.
     """
     print(f"🕷️ CRAWLER: Starting discovery on {start_url}...")
     
-    # Normalize start URL (remove trailing slash for consistency)
+    # QA Fix: Normalize start URL and domain (remove trailing slash, normalize www)
     start_url = start_url.rstrip('/')
-    base_domain = urlparse(start_url).netloc
+    parsed_start = urlparse(start_url)
+    base_domain = parsed_start.netloc.replace('www.', '')  # Normalize: example.com
     
     found_urls = set()
     found_urls.add(start_url)
@@ -62,9 +65,10 @@ async def crawl_website(start_url: str, max_pages: int = 10):
                     # Clean the URL
                     full_url = urljoin(current_url, href).split('#')[0].rstrip('/')
                     parsed = urlparse(full_url)
+                    current_domain = parsed.netloc.replace('www.', '')  # QA Fix: Normalize domain
 
                     # Logic: Internal Domain ONLY + Not a file + Not already found
-                    if (parsed.netloc == base_domain and 
+                    if (current_domain == base_domain and 
                         parsed.scheme in ['http', 'https'] and
                         not any(full_url.lower().endswith(ext) for ext in IGNORED_EXTENSIONS) and
                         full_url not in found_urls):

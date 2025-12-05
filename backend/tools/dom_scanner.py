@@ -50,10 +50,20 @@ async def scan_page(url: str):
                     () => ({
                         links: Array.from(document.querySelectorAll('a[href]'))
                             .slice(0, 50)
-                            .map(a => ({
-                                text: a.innerText.trim() || "No Text",
-                                href: a.href
-                            })),
+                            .map(a => {
+                                // Helper to generate a simple unique selector
+                                const getSelector = (el) => {
+                                    if (el.id) return '#' + el.id;
+                                    if (el.className) return '.' + el.className.split(' ')[0];
+                                    return el.tagName.toLowerCase();
+                                };
+                                return {
+                                    text: a.innerText.trim() || "No Text",
+                                    href: a.href,
+                                    html: a.outerHTML.substring(0, 200), // Capture snippet
+                                    selector: getSelector(a) // Basic selector
+                                };
+                            }),
                         headings: Array.from(
                             document.querySelectorAll('h1, h2, h3, h4, h5, h6')
                         ).map(h => ({

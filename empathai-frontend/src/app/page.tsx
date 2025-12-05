@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Network,
   Rocket,
@@ -14,8 +14,10 @@ import {
   Check,
   X,
   MousePointer2,
-  Type, // <--- Added new icons
+  Type,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // UI Components
 import {
@@ -85,16 +87,44 @@ export default function Home() {
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditProgress, setAuditProgress] = useState(0);
 
+  // Ref for dropdown to detect clicks outside
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
   // --- ACTIONS ---
 
   const startCrawl = async () => {
     if (!url) return;
+    
+    // QA Fix: Strict URL Validation
+    const urlRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+    if (!urlRegex.test(url)) {
+      alert("Please enter a valid URL (e.g., https://example.com)");
+      return;
+    }
+
     setIsCrawling(true);
     try {
       const res = await fetch(`${API_BASE}/crawl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, max_pages: 10 }),
+        body: JSON.stringify({ url, max_pages: 50 }),
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
@@ -147,13 +177,72 @@ export default function Home() {
     setIsAuditing(false);
   };
 
+  // QA Fix: Export PDF Functionality
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    let yPos = 20;
+
+    doc.setFontSize(20);
+    doc.text("Ay11Sutra Audit Report", 14, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, yPos);
+    yPos += 15;
+
+    Object.entries(auditResults).forEach(([pageUrl, data]) => {
+      // Add new page if running out of space
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(249, 115, 22); // Orange
+      doc.text(`Page: ${pageUrl}`, 14, yPos);
+      yPos += 8;
+      doc.setTextColor(0, 0, 0); // Black
+
+      const summary = data.summary;
+      doc.setFontSize(10);
+      doc.text(
+        `Total Issues: ${summary.total}`,
+        14,
+        yPos
+      );
+      yPos += 10;
+
+      const rows = data.report.map((issue) => [
+        issue.rule,
+        issue.description.substring(0, 100) + (issue.description.length > 100 ? "..." : ""),
+        issue.fix_priority,
+        issue.wcag_sc || "N/A",
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [["Rule", "Description", "Priority", "WCAG"]],
+        body: rows,
+        theme: "grid",
+        headStyles: { fillColor: [249, 115, 22] },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 1: { cellWidth: 80 } }, // Description column width
+      });
+
+      // @ts-ignore
+      yPos = doc.lastAutoTable.finalY + 15;
+    });
+
+    doc.save("Ay11Sutra_Audit_Report.pdf");
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900">
       {/* 1. Navbar */}
       <nav className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg">
+            <div className="bg-primary p-1.5 rounded-lg">
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-xl tracking-tight">
@@ -176,7 +265,7 @@ export default function Home() {
         {/* 2. Discovery Section */}
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="bg-slate-50/50 border-b pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg text-blue-700">
+            <CardTitle className="flex items-center gap-2 text-lg text-primary">
               <Network className="w-5 h-5" />
               1. Discovery Phase
             </CardTitle>
@@ -197,11 +286,45 @@ export default function Home() {
                 onClick={startCrawl}
                 disabled={isCrawling}
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700 h-11"
+                className="bg-primary hover:bg-primary/90 h-11"
               >
                 {isCrawling ? "Scanning..." : "Start Discovery"}
               </Button>
             </div>
+            
+            {/* Crawling Progress Indicator */}
+            {isCrawling && (
+              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-orange-900">
+                      🕷️ Crawling website...
+                    </p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Discovering pages (up to 50 pages)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Success Message */}
+            {!isCrawling && crawledPages.length > 0 && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">
+                      ✅ Discovery complete!
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      Found {crawledPages.length} page{crawledPages.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -217,28 +340,41 @@ export default function Home() {
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6 overflow-visible">
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">
                   Choose pages to audit:
                 </label>
 
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-300 rounded-lg text-left shadow-sm hover:border-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <span className="text-slate-700">
-                    {selectedPages.length === 0
-                      ? "Select pages..."
-                      : selectedPages.length === crawledPages.length
-                      ? "All Pages Selected"
-                      : `${selectedPages.length} pages selected`}
-                  </span>
-                  <ChevronDown
-                    className={`w-5 h-5 text-slate-400 transition-transform ${
-                      isDropdownOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex-1 flex items-center justify-between px-4 py-3 bg-white border border-slate-300 rounded-lg text-left shadow-sm hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <span className="text-slate-700">
+                      {selectedPages.length === 0
+                        ? "Select pages..."
+                        : selectedPages.length === crawledPages.length
+                        ? "All Pages Selected"
+                        : `${selectedPages.length} pages selected`}
+                    </span>
+                    <ChevronDown
+                      className={`w-5 h-5 text-slate-400 transition-transform ${
+                        isDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {/* Deselect All button next to dropdown */}
+                  {selectedPages.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => setSelectedPages([])}
+                    >
+                      Deselect All
+                    </Button>
+                  )}
+                </div>
 
                 {isDropdownOpen && (
                   <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-xl max-h-80 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
@@ -254,10 +390,10 @@ export default function Home() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full text-xs h-8"
+                        className="w-full text-xs h-8 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                         onClick={() => setSelectedPages([])}
                       >
-                        Clear
+                        Deselect All
                       </Button>
                     </div>
                     <div className="overflow-y-auto p-2 space-y-1">
@@ -277,7 +413,7 @@ export default function Home() {
                               flex items-center px-3 py-2.5 rounded-md cursor-pointer text-sm transition-colors
                               ${
                                 isSelected
-                                  ? "bg-blue-50 text-blue-700 font-medium"
+                                  ? "bg-orange-50 text-orange-700 font-medium"
                                   : "text-slate-600 hover:bg-slate-50"
                               }
                             `}
@@ -285,7 +421,7 @@ export default function Home() {
                             <div
                               className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
                                 isSelected
-                                  ? "bg-blue-600 border-blue-600"
+                                  ? "bg-primary border-primary"
                                   : "border-slate-300 bg-white"
                               }`}
                             >
@@ -293,8 +429,8 @@ export default function Home() {
                                 <Check className="w-3.5 h-3.5 text-white" />
                               )}
                             </div>
-                            <span className="truncate">
-                              {page.replace(/^https?:\/\//, "")}
+                            <span className="truncate text-xs" title={page}>
+                              {page}
                             </span>
                           </div>
                         );
@@ -305,14 +441,14 @@ export default function Home() {
               </div>
 
               {selectedPages.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {selectedPages.slice(0, 5).map((page) => (
+                <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto p-2 border rounded-md bg-slate-50">
+                  {selectedPages.map((page) => (
                     <span
                       key={page}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-sm"
+                      title={page}
                     >
-                      {page.replace(/^https?:\/\//, "").split("/")[0]}...
-                      {page.split("/").pop()?.slice(0, 10)}
+                      {page.length > 30 ? "..." + page.slice(-30) : page}
                       <X
                         className="w-3 h-3 ml-1.5 cursor-pointer hover:text-red-500"
                         onClick={() =>
@@ -374,6 +510,7 @@ export default function Home() {
                   variant="outline"
                   size="sm"
                   className="text-black border-white/20 hover:bg-white/10 hover:text-white transition-colors"
+                  onClick={exportPDF}
                 >
                   <Download className="w-4 h-4 mr-2" /> Export PDF
                 </Button>
@@ -392,7 +529,7 @@ export default function Home() {
                       <TabsTrigger
                         key={url}
                         value={url}
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white px-4 py-2 text-sm"
+                        className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 text-sm"
                       >
                         {url.replace(/^https?:\/\//, "").split("/")[0]}...
                       </TabsTrigger>
@@ -503,7 +640,7 @@ export default function Home() {
                                 <AccordionItem
                                   key={idx}
                                   value={`item-${idx}`}
-                                  className="bg-white border border-slate-200 rounded-lg px-0 overflow-hidden data-[state=open]:ring-1 data-[state=open]:ring-blue-500"
+                                  className="bg-white border border-slate-200 rounded-lg px-0 overflow-hidden data-[state=open]:ring-1 data-[state=open]:ring-primary"
                                 >
                                   <AccordionTrigger className="px-4 py-4 hover:bg-slate-50 hover:no-underline">
                                     <div className="flex items-center gap-4 text-left w-full">
@@ -602,7 +739,7 @@ export default function Home() {
 
                                         {issue.ai_explanation ? (
                                           <div className="space-y-3">
-                                            <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-900 border border-blue-100">
+                                            <div className="bg-orange-50 p-3 rounded-md text-sm text-orange-900 border border-orange-100">
                                               {issue.ai_explanation}
                                             </div>
                                             <div className="relative">

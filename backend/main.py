@@ -30,7 +30,7 @@ app.add_middleware(
 
 class CrawlRequest(BaseModel):
     url: str
-    max_pages: int = 5
+    max_pages: int = 50
 
 class AuditRequest(BaseModel):
     url: str
