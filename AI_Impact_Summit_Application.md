@@ -124,7 +124,7 @@ EmpathAI is an **Autonomous Accessibility Auditing Agent** that uses a multi-age
 
 **No** - We utilize a hybrid approach:
 - **SLM Layer**: Heuristic-based Fast Critic for pre-filtering (rule-based, not ML)
-- **LLM**: Google Gemini 2.0 Flash for semantic analysis and code generation
+- **LLM**: Google Gemini 2.5 Flash-lite for semantic analysis and code generation
 
 ---
 

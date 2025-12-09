@@ -22,7 +22,7 @@ api_key = os.getenv("GOOGLE_API_KEY")
 # --- CONFIGURATION ---
 # Force REST transport to avoid SSL/gRPC issues with corporate proxies
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite", 
+    model="gemini-2.5-flash-lite", 
     temperature=0, 
     google_api_key=api_key,
     transport="rest"  # Use REST instead of gRPC to avoid SSL certificate issues

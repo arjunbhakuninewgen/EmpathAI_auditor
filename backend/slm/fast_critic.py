@@ -25,7 +25,7 @@ USE_MODEL_SLM = os.getenv("USE_MODEL_SLM", "false").lower() == "true"
 # Initialize Gemini Flash Lite for model-based SLM (only if enabled)
 if USE_MODEL_SLM:
     slm_model = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash-lite",  # Fast, cheap model for classification
+        model="gemini-2.5-flash-lite",  # Fast, cheap model for classification
         temperature=0.1,  # Low temperature for deterministic classification
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         transport="rest"  # Avoid SSL issues
