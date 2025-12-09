@@ -117,41 +117,46 @@ async def scan_page(url: str):
             results = await axe.run(page)
 
             print(f"🔍 DEBUG: Axe result type = {type(results)}")
-            print(f"🔍 DEBUG: Axe has 'violations' attr? {hasattr(results, 'violations')}")
-            print(f"🔍 DEBUG: Axe has 'to_dict' attr? {hasattr(results, 'to_dict')}")
-            print(f"🔍 DEBUG: Axe has '__getitem__' attr? {hasattr(results, '__getitem__')}")
+            print(f"🔍 DEBUG: Axe violations_count = {getattr(results, 'violations_count', 'N/A')}")
 
             # ------- ROBUST VIOLATION EXTRACTION -------
             violations = []
 
-            # Strategy 1: direct attribute (some versions expose this)
-            if hasattr(results, "violations"):
+            # The axe-playwright-python library stores results in the 'response' property
+            # which is a dict containing 'violations', 'passes', 'incomplete', etc.
+            try:
+                if hasattr(results, 'response') and results.response:
+                    response_data = results.response
+                    if isinstance(response_data, dict):
+                        violations = response_data.get("violations", []) or []
+                        print(f"🔍 DEBUG: Extracted {len(violations)} violations from response.violations")
+                    elif isinstance(response_data, str):
+                        # Sometimes it's a JSON string
+                        import json
+                        response_dict = json.loads(response_data)
+                        violations = response_dict.get("violations", []) or []
+                        print(f"🔍 DEBUG: Extracted {len(violations)} violations from JSON response")
+            except Exception as e:
+                print(f"⚠️ Failed to extract from response: {e}")
+
+            # Fallback: Try direct attribute access
+            if not violations and hasattr(results, "violations"):
                 try:
                     violations = results.violations or []
-                except Exception:
-                    pass
+                    print(f"🔍 DEBUG: Extracted {len(violations)} violations from direct attribute")
+                except Exception as e:
+                    print(f"⚠️ Failed direct attribute access: {e}")
 
-            # Strategy 2: mapping-style access (your version is likely doing this)
+            # Fallback: Try dict-style access
             if not violations and hasattr(results, "__getitem__"):
                 try:
                     violations = results["violations"] or []
-                except Exception:
-                    pass
-
-            # Strategy 3: dict
-            if not violations and isinstance(results, dict):
-                violations = results.get("violations", []) or []
-
-            # Strategy 4: response wrapper
-            if not violations and hasattr(results, "response"):
-                try:
-                    resp = getattr(results, "response", {}) or {}
-                    if isinstance(resp, dict):
-                        violations = resp.get("violations", []) or []
-                except Exception:
-                    pass
+                    print(f"🔍 DEBUG: Extracted {len(violations)} violations from dict access")
+                except Exception as e:
+                    print(f"⚠️ Failed dict access: {e}")
 
             print(f"✅ TOOL: Found {len(violations)} raw syntax violations.")
+
 
             await browser.close()
 

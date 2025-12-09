@@ -24,7 +24,7 @@ class AuditState(TypedDict):
     # RAW DATA
     raw_violations: List[Dict[Any, Any]] # Axe (Syntax)
     dom_content: Dict[str, Any]          # New: For Semantic Analysis
-    tab_order_log: List[str]             # New: For Interaction Analysis
+    tab_log: List[Dict[str, Any]]        # New: For Interaction Analysis (FIXED: was tab_order_log)
 
     # ISSUES LISTS
     critiqued_issues: List[AccessibilityIssue] # Syntax
