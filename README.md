@@ -139,24 +139,33 @@ npm run dev
 ay11sutra/
 ├── backend/
 │   ├── main.py                 # FastAPI entry point
+│   ├── auth/                   # 🔐 Authentication
+│   │   ├── routes.py           # Login/Register endpoints
+│   │   ├── jwt.py              # Token handling
+│   │   └── password.py         # Bcrypt hashing
+│   ├── cache/                  # 🚀 Caching Layer
+│   │   ├── redis_cache.py      # Upstash Redis client
+│   │   └── dom_cache.py        # DOM fingerprinting
+│   ├── database/               # 💾 PostgreSQL DB
+│   │   ├── models.py           # SQLAlchemy User/Audit models
+│   │   ├── crud.py             # DB operations
+│   │   └── connection.py       # Neon DB connection
 │   ├── graph/
 │   │   ├── nodes.py            # 7 Agent implementations
-│   │   ├── workflow.py         # LangGraph StateGraph
-│   │   └── state.py            # TypedDict state schema
+│   │   └── workflow.py         # LangGraph StateGraph
 │   ├── tools/
 │   │   ├── dom_scanner.py      # Playwright + Axe-core
-│   │   ├── wcag_mapper.py      # WCAG + GIGW 3.0 mapping
-│   │   └── crawler.py          # Multi-page crawler
-│   ├── guardrails/
-│   │   ├── input_guard.py      # URL validation
-│   │   └── output_guard.py     # XSS prevention
-│   └── slm/
-│       └── fast_critic.py      # Hybrid SLM filtering
+│   │   └── wcag_mapper.py      # GIGW 3.0 mapping
+│   ├── guardrails/             # Security barriers
+│   └── slm/                    # Hybrid Critic model
 ├── empathai-frontend/
 │   ├── src/app/
-│   │   ├── page.tsx            # Main dashboard
-│   │   └── globals.css         # Theme (Orange/Black)
-│   └── package.json
+│   │   ├── page.tsx            # 🏠 Dashboard
+│   │   ├── login/              # 🔐 Login Page
+│   │   ├── history/            # 📜 Audit History
+│   │   ├── report/             # 📊 Report Viewer (Static)
+│   │   └── globals.css         # Theme
+│   └── components/             # Reusable UI components
 └── requirements.txt
 ```
 
