@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +9,10 @@ import { AuditReportView } from "@/components/audit-report-view";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-export default function ReportPage() {
+function ReportContent() {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
 
   const [auditData, setAuditData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -187,4 +187,12 @@ export default function ReportPage() {
       </main>
     </div>
   );
+}
+
+export default function ReportPage() {
+    return (
+        <Suspense fallback={<div>Loading Report...</div>}>
+            <ReportContent />
+        </Suspense>
+    );
 }

@@ -42,9 +42,15 @@ flowchart LR
     API --> A1
     A7 --> API
     
-    A4 -.-> G[☁️ Gemini]
     A6 -.-> G
     A7 -.-> G
+
+    subgraph Security["🔐 Security & Auth"]
+        Auth[JWT AuthMiddleware]
+        Cache[Redis Cache]
+    end
+
+    API --> Auth --> Cache --> A1
 ```
 
 ### 🤖 Agent Overview
@@ -166,11 +172,10 @@ sequenceDiagram
     participant W as LangGraph
     participant G as Gemini
 
-    U->>F: Enter URL
-    F->>A: POST /crawl
-    A-->>F: List of pages
-    U->>F: Select pages
-    F->>A: POST /audit
+    U->>F: Login & Enter URL
+    F->>A: POST /auth/login
+    A-->>F: JWT Token
+    F->>A: POST /audit (with Token)
     A->>W: Invoke workflow
     
     W->>W: 🛡️ Validate URL

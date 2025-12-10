@@ -170,7 +170,7 @@ export default function HistoryPage() {
                       variant="outline" 
                       size="sm" 
                       className="hidden sm:flex cursor-pointer hover:bg-slate-100"
-                      onClick={() => router.push(`/report/${audit.id}`)}
+                      onClick={() => router.push(`/report?id=${audit.id}`)}
                     >
                       View Report
                     </Button>
