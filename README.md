@@ -57,7 +57,19 @@ flowchart LR
 | **Semantic** | AI | Gemini 2.5 Flash-Lite | Link/heading analysis |
 | **Interaction** | Rule-Based | Tab log analysis | Keyboard nav testing |
 | **Vision** | AI | Gemini Vision | Screenshot analysis |
+| **Critic** | Hybrid | Heuristics + Gemini | Filter false positives |
+| **Semantic** | AI | Gemini 2.5 Flash-Lite | Link/heading analysis |
+| **Interaction** | Rule-Based | Tab log analysis | Keyboard nav testing |
+| **Vision** | AI | Gemini Vision | Screenshot analysis |
 | **Fixer** | AI + Guard | Gemini + Sanitizer | Generate HTML fixes |
+
+### ✨ New Features (v1.2)
+
+- **🔐 Enterprise Authentication**: Secure login/signup with JWT & persistent sessions.
+- **📜 Smart History**: Tracks all scans per user with filtering (hides cached spam).
+- **🚀 Time-Based Caching**: 5-minute intelligent cache to prevent redundant scans.
+- **📊 Advanced Reporting**: Dedicated report views with AI solutions & PDF export.
+- **📄 Professional PDF**: Industry-standard audit reports with branded headers & full details.
 
 ---
 
@@ -235,6 +247,9 @@ Maps WCAG to Indian government standards:
 | **Orchestration** | LangGraph |
 | **Browser** | Playwright |
 | **Scanner** | Axe-core |
+| **Scanner** | Axe-core |
+| **Security** | JWT Auth, Role-Based Access |
+| **Caching** | Redis (Upstash) + Time-Based (TTL) |
 | **UI** | Tailwind CSS, shadcn/ui |
 
 ---
