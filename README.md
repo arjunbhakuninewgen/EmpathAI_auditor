@@ -282,6 +282,4 @@ Maps WCAG to Indian government standards:
 
 **Project Maintainer**: Arjun Singh
 
----
 
-**Made with ❤️ for Digital Inclusion in India** 🇮🇳
