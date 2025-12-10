@@ -21,6 +21,7 @@ api_key = os.getenv("GOOGLE_API_KEY")
 
 # --- CONFIGURATION ---
 # Force REST transport to avoid SSL/gRPC issues with corporate proxies
+# Using gemini-2.0-flash instead of gemini-2.5-flash-lite for higher free tier quota (1500 vs 20 req/day)
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash-lite", 
     temperature=0, 
@@ -45,17 +46,29 @@ async def scanner_node(state: dict) -> dict:
     if "error" in result:
         return {
             "raw_violations": [], "screenshot_b64": None,
-            "dom_content": {}, "tab_log": []
+            "dom_content": {}, "tab_log": [], "dom_hash": ""
         }
 
     raw_list = result.get("violations", [])
     enriched = [enrich_with_wcag(v) for v in raw_list]
     
+    # Compute DOM hash for caching
+    dom_hash = ""
+    html = result.get("html", "")
+    if html:
+        try:
+            from cache.dom_cache import compute_dom_hash
+            dom_hash = compute_dom_hash(html)
+            print(f"🔑 DOM Hash: {dom_hash[:16]}...")
+        except Exception as e:
+            print(f"⚠️ DOM hash error: {e}")
+    
     return {
         "raw_violations": enriched,
         "screenshot_b64": result.get("screenshot"),
         "dom_content": result.get("dom_content", {}),
-        "tab_log": result.get("tab_log", [])
+        "tab_log": result.get("tab_log", []),
+        "dom_hash": dom_hash
     }
 
 # --- NODE 2: CRITIC ---

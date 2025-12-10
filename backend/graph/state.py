@@ -20,6 +20,7 @@ class AccessibilityIssue(TypedDict, total=False):
 class AuditState(TypedDict):
     url: str
     screenshot_b64: Optional[str]
+    dom_hash: Optional[str]  # For cache key
     
     # RAW DATA
     raw_violations: List[Dict[Any, Any]] # Axe (Syntax)

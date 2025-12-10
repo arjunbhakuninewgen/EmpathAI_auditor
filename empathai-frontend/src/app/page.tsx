@@ -1,25 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Network,
   Rocket,
-  Download,
-  CheckCircle2,
-  AlertCircle,
   ShieldCheck,
-  Eye,
-  FileCode,
-  ChevronDown,
-  Check,
-  X,
-  MousePointer2,
-  Type,
+  AlertCircle,
+  Menu,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
-// UI Components
 import {
   Card,
   CardContent,
@@ -30,20 +18,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { AuditReportView } from "@/components/audit-report-view";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+// Valid TLDs for URL validation
+const VALID_TLDS = [
+  "com", "org", "net", "edu", "gov", "io", "co", "in", "uk", "us", "de", "fr",
+  "jp", "cn", "ru", "br", "au", "ca", "es", "it", "nl", "pl", "se", "ch", "at",
+  "be", "dk", "fi", "no", "nz", "za", "sg", "hk", "kr", "tw", "mx", "ar", "cl",
+  "info", "biz", "me", "tv", "cc", "xyz", "online", "site", "tech", "dev", "app",
+  "ai", "cloud", "digital", "solutions", "agency", "design", "studio", "blog",
+  "shop", "store", "news", "media", "group", "global", "world", "asia", "eu"
+];
 
-// --- TYPES ---
+// --- TYPES (for state) ---
 interface Issue {
   rule: string;
   description: string;
@@ -73,172 +64,177 @@ interface AuditData {
 }
 
 export default function Home() {
-  // State
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const router = useRouter();
+  
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Main State
   const [url, setUrl] = useState("");
-  const [crawledPages, setCrawledPages] = useState<string[]>([]);
-  const [selectedPages, setSelectedPages] = useState<string[]>([]);
-  const [auditResults, setAuditResults] = useState<Record<string, AuditData>>(
-    {}
-  );
+  const [auditResult, setAuditResult] = useState<AuditData | null>(null);
+  const [urlError, setUrlError] = useState("");
 
   // UI State
-  const [isCrawling, setIsCrawling] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditProgress, setAuditProgress] = useState(0);
+  // New account menu state
+  const [userInfo, setUserInfo] = useState<{name:string; email:string} | null>(null);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
-  // Ref for dropdown to detect clicks outside
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
+  // Check auth on mount
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
+    const checkAuth = async () => {
+      const auth = localStorage.getItem("ay11sutra_auth");
+      const token = localStorage.getItem("ay11sutra_token");
+
+      if (auth === "true" && token) {
+        setIsAuthenticated(true);
+        try {
+          const res = await fetch(`${API_BASE}/auth/me`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` },
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            setUserInfo({ name: data.name, email: data.email });
+          } else {
+            console.error("Auth token invalid or expired");
+            // Optional: Auto-logout if token is bad?
+            // handleLogout(); 
+          }
+        } catch (err) {
+          console.error("Failed to fetch user info", err);
+        }
+      } else {
+        router.push("/login");
       }
+      setIsLoading(false);
     };
 
-    if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+    checkAuth();
+  }, [router]);
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDropdownOpen]);
-
-  // --- ACTIONS ---
-
-  const startCrawl = async () => {
-    if (!url) return;
-    
-    // QA Fix: Strict URL Validation
-    const urlRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-    if (!urlRegex.test(url)) {
-      alert("Please enter a valid URL (e.g., https://example.com)");
-      return;
-    }
-
-    setIsCrawling(true);
-    try {
-      const res = await fetch(`${API_BASE}/crawl`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, max_pages: 50 }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-
-      const pages = data.urls || [];
-      setCrawledPages(pages);
-      setSelectedPages(pages.slice(0, 1));
-      setAuditResults({});
-    } catch (err) {
-      alert("Crawler failed. Ensure Backend is running on Port 8000.");
-    }
-    setIsCrawling(false);
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("ay11sutra_auth");
+    localStorage.removeItem("ay11sutra_token");
+    setUserInfo(null);
+    router.push("/login");
   };
 
-  const runAudit = async () => {
-    if (selectedPages.length === 0) return;
-    setIsAuditing(true);
-    setAuditProgress(0);
-    const results: Record<string, AuditData> = {};
+  // --- URL VALIDATION (CNA010 Fix) ---
+  const validateUrl = (inputUrl: string): { valid: boolean; error: string } => {
+    if (!inputUrl.trim()) {
+      return { valid: false, error: "Please enter a URL" };
+    }
 
-    for (let i = 0; i < selectedPages.length; i++) {
-      const page = selectedPages[i];
-      try {
-        const res = await fetch(`${API_BASE}/audit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: page }),
-        });
-        const data = await res.json();
-        results[page] = data;
-      } catch (err) {
-        console.error(err);
-        results[page] = {
-          summary: {
-            total: 0,
-            critical: 0,
-            serious: 0,
-            minor: 0,
-            india_compliance: "N/A",
-            status: "Error",
-          },
-          report: [],
-          error: "Failed to audit page",
+    // Add https:// if missing
+    let urlToCheck = inputUrl;
+    if (!urlToCheck.startsWith("http://") && !urlToCheck.startsWith("https://")) {
+      urlToCheck = "https://" + urlToCheck;
+    }
+
+    try {
+      const parsed = new URL(urlToCheck);
+      const hostname = parsed.hostname;
+      
+      // Extract TLD
+      const parts = hostname.split(".");
+      if (parts.length < 2) {
+        return { valid: false, error: "Invalid URL format" };
+      }
+      
+      const tld = parts[parts.length - 1].toLowerCase();
+      
+      // Check if TLD is valid
+      if (!VALID_TLDS.includes(tld)) {
+        return { 
+          valid: false, 
+          error: `Invalid domain extension ".${tld}". Did you mean ".com"?` 
         };
       }
-      setAuditProgress(((i + 1) / selectedPages.length) * 100);
+
+      return { valid: true, error: "" };
+    } catch {
+      return { valid: false, error: "Invalid URL format. Please enter a valid URL." };
+    }
+  };
+
+  // --- AUDIT ACTION ---
+  const runAudit = async () => {
+    // Validate URL first
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      setUrlError(validation.error);
+      return;
+    }
+    setUrlError("");
+
+    // Normalize URL
+    let auditUrl = url;
+    if (!auditUrl.startsWith("http://") && !auditUrl.startsWith("https://")) {
+      auditUrl = "https://" + auditUrl;
     }
 
-    setAuditResults(results);
-    setIsAuditing(false);
-  };
+    setIsAuditing(true);
+    setAuditProgress(10);
 
-  // QA Fix: Export PDF Functionality
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    let yPos = 20;
+    try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setAuditProgress((prev) => Math.min(prev + 5, 90));
+      }, 500);
 
-    doc.setFontSize(20);
-    doc.text("Ay11Sutra Audit Report", 14, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, yPos);
-    yPos += 15;
-
-    Object.entries(auditResults).forEach(([pageUrl, data]) => {
-      // Add new page if running out of space
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
-
-      doc.setFontSize(14);
-      doc.setTextColor(249, 115, 22); // Orange
-      doc.text(`Page: ${pageUrl}`, 14, yPos);
-      yPos += 8;
-      doc.setTextColor(0, 0, 0); // Black
-
-      const summary = data.summary;
-      doc.setFontSize(10);
-      doc.text(
-        `Total Issues: ${summary.total}`,
-        14,
-        yPos
-      );
-      yPos += 10;
-
-      const rows = data.report.map((issue) => [
-        issue.rule,
-        issue.description.substring(0, 100) + (issue.description.length > 100 ? "..." : ""),
-        issue.fix_priority,
-        issue.wcag_sc || "N/A",
-      ]);
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [["Rule", "Description", "Priority", "WCAG"]],
-        body: rows,
-        theme: "grid",
-        headStyles: { fillColor: [249, 115, 22] },
-        styles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: { 1: { cellWidth: 80 } }, // Description column width
+      // Get JWT token
+      const token = localStorage.getItem("ay11sutra_token");
+      
+      const res = await fetch(`${API_BASE}/audit`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ url: auditUrl }),
       });
 
-      // @ts-ignore
-      yPos = doc.lastAutoTable.finalY + 15;
-    });
+      clearInterval(progressInterval);
+      setAuditProgress(100);
 
-    doc.save("Ay11Sutra_Audit_Report.pdf");
+      if (!res.ok) {
+        throw new Error("Audit failed");
+      }
+
+      const data = await res.json();
+      setAuditResult(data);
+    } catch (err) {
+      console.error(err);
+      setUrlError("Failed to audit. Please check if the URL is accessible and the backend is running.");
+      setAuditResult(null);
+    }
+
+    setIsAuditing(false);
+    setAuditProgress(0);
   };
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900">
-      {/* 1. Navbar */}
+      {/* Navbar */}
       <nav className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -255,575 +251,114 @@ export default function Home() {
               Enterprise
             </Badge>
           </div>
-          <div className="text-sm text-slate-500">
-            Autonomous Accessibility Auditor
+          
+          <div className="flex items-center gap-4">
+            {userInfo && (
+              <div className="relative inline-block text-left">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAccountMenu(!showAccountMenu)}
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                >
+                  <Menu className="w-5 h-5" />
+                  <span className="font-medium">{userInfo.name || userInfo.email}</span>
+                </Button>
+
+                {showAccountMenu && (
+                  <div className="absolute right-0 mt-2 w-64 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden origin-top-right animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-slate-50 px-4 py-3 border-b border-slate-100">
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {userInfo.name || "User"}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {userInfo.email}
+                      </p>
+                    </div>
+                    <div className="p-1">
+                      <button
+                        onClick={() => router.push('/history')}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-3"
+                      >
+                        <span className="text-lg">📜</span> History
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3"
+                      >
+                        <span className="text-lg">🚪</span> Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto p-6 space-y-8 mt-4">
-        {/* 2. Discovery Section */}
+        {/* URL Input Section */}
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="bg-slate-50/50 border-b pb-4">
             <CardTitle className="flex items-center gap-2 text-lg text-primary">
-              <Network className="w-5 h-5" />
-              1. Discovery Phase
+              <Rocket className="w-5 h-5" />
+              Scan URL for Accessibility Issues
             </CardTitle>
             <CardDescription>
-              Enter a root URL to map the website structure.
+              Enter a URL to scan for WCAG 2.1/2.2 accessibility violations
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
             <div className="flex gap-3 max-w-3xl">
-              <Input
-                placeholder="https://example.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="h-11 text-base shadow-sm"
-                onKeyDown={(e) => e.key === "Enter" && startCrawl()}
-              />
+              <div className="flex-1">
+                <Input
+                  placeholder="https://example.com"
+                  value={url}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    setUrlError("");
+                  }}
+                  className={`h-11 text-base shadow-sm ${urlError ? "border-red-500" : ""}`}
+                  onKeyDown={(e) => e.key === "Enter" && runAudit()}
+                />
+                {urlError && (
+                  <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {urlError}
+                  </p>
+                )}
+              </div>
               <Button
-                onClick={startCrawl}
-                disabled={isCrawling}
+                onClick={runAudit}
+                disabled={isAuditing}
                 size="lg"
                 className="bg-primary hover:bg-primary/90 h-11"
               >
-                {isCrawling ? "Scanning..." : "Start Discovery"}
+                {isAuditing ? "Scanning..." : "Scan Now"}
               </Button>
             </div>
-            
-            {/* Crawling Progress Indicator */}
-            {isCrawling && (
-              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg animate-pulse">
-                <div className="flex items-center gap-3">
+
+            {/* Progress Indicator */}
+            {isAuditing && (
+              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-orange-900">
-                      🕷️ Crawling website...
-                    </p>
-                    <p className="text-xs text-orange-700 mt-1">
-                      Discovering pages (up to 50 pages)
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-orange-900">
+                    🔍 Scanning for accessibility issues...
+                  </p>
                 </div>
-              </div>
-            )}
-            
-            {/* Success Message */}
-            {!isCrawling && crawledPages.length > 0 && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-green-900">
-                      ✅ Discovery complete!
-                    </p>
-                    <p className="text-xs text-green-700 mt-1">
-                      Found {crawledPages.length} page{crawledPages.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
+                <Progress value={auditProgress} className="h-2" />
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* 3. Page Selection */}
-        {crawledPages.length > 0 && (
-          <Card className="border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-3 overflow-visible">
-            <CardHeader className="bg-slate-50/50 border-b pb-4">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg">2. Select Pages</CardTitle>
-                <Badge variant="secondary">
-                  {selectedPages.length} Selected
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6 overflow-visible">
-              <div className="relative" ref={dropdownRef}>
-                <label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                  Choose pages to audit:
-                </label>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="flex-1 flex items-center justify-between px-4 py-3 bg-white border border-slate-300 rounded-lg text-left shadow-sm hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <span className="text-slate-700">
-                      {selectedPages.length === 0
-                        ? "Select pages..."
-                        : selectedPages.length === crawledPages.length
-                        ? "All Pages Selected"
-                        : `${selectedPages.length} pages selected`}
-                    </span>
-                    <ChevronDown
-                      className={`w-5 h-5 text-slate-400 transition-transform ${
-                        isDropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                  {/* Deselect All button next to dropdown */}
-                  {selectedPages.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto border-red-200 text-red-600 hover:bg-red-50"
-                      onClick={() => setSelectedPages([])}
-                    >
-                      Deselect All
-                    </Button>
-                  )}
-                </div>
-
-                {isDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-xl max-h-80 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
-                    <div className="p-2 border-b bg-slate-50 flex gap-2 sticky top-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs h-8"
-                        onClick={() => setSelectedPages([...crawledPages])}
-                      >
-                        Select All
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs h-8 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-                        onClick={() => setSelectedPages([])}
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
-                    <div className="overflow-y-auto p-2 space-y-1">
-                      {crawledPages.map((page) => {
-                        const isSelected = selectedPages.includes(page);
-                        return (
-                          <div
-                            key={page}
-                            onClick={() => {
-                              if (isSelected)
-                                setSelectedPages(
-                                  selectedPages.filter((p) => p !== page)
-                                );
-                              else setSelectedPages([...selectedPages, page]);
-                            }}
-                            className={`
-                              flex items-center px-3 py-2.5 rounded-md cursor-pointer text-sm transition-colors
-                              ${
-                                isSelected
-                                  ? "bg-orange-50 text-orange-700 font-medium"
-                                  : "text-slate-600 hover:bg-slate-50"
-                              }
-                            `}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
-                                isSelected
-                                  ? "bg-primary border-primary"
-                                  : "border-slate-300 bg-white"
-                              }`}
-                            >
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-white" />
-                              )}
-                            </div>
-                            <span className="truncate text-xs" title={page}>
-                              {page}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {selectedPages.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto p-2 border rounded-md bg-slate-50">
-                  {selectedPages.map((page) => (
-                    <span
-                      key={page}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 shadow-sm"
-                      title={page}
-                    >
-                      {page.length > 30 ? "..." + page.slice(-30) : page}
-                      <X
-                        className="w-3 h-3 ml-1.5 cursor-pointer hover:text-red-500"
-                        onClick={() =>
-                          setSelectedPages(
-                            selectedPages.filter((p) => p !== page)
-                          )
-                        }
-                      />
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-col items-center gap-4 border-t pt-6 mt-6">
-                <Button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    runAudit();
-                  }}
-                  disabled={isAuditing || selectedPages.length === 0}
-                  size="lg"
-                  className="w-full max-w-md bg-green-600 hover:bg-green-700 h-12 font-bold text-lg shadow-sm"
-                >
-                  {isAuditing ? (
-                    <span className="flex items-center gap-2">
-                      <Rocket className="w-5 h-5 animate-spin" />
-                      Auditing... {Math.round(auditProgress)}%
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Rocket className="w-5 h-5" />
-                      Run Deep Audit ({selectedPages.length})
-                    </span>
-                  )}
-                </Button>
-                {isAuditing && (
-                  <Progress
-                    value={auditProgress}
-                    className="w-full max-w-md h-2"
-                  />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 4. Audit Results */}
-        {Object.keys(auditResults).length > 0 && (
-          <Card className="border-slate-200 shadow-xl overflow-hidden">
-            <CardHeader className="bg-slate-900 text-white ">
-              <div className="flex justify-between items-center py-5">
-                <div>
-                  <CardTitle className="text-xl">3. Audit Report</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Breakdown by Agent (Syntax, Visual, Semantic, Interaction)
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-black border-white/20 hover:bg-white/10 hover:text-white transition-colors"
-                  onClick={exportPDF}
-                >
-                  <Download className="w-4 h-4 mr-2" /> Export PDF
-                </Button>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-0">
-              <Tabs
-                defaultValue={Object.keys(auditResults)[0]}
-                className="w-full"
-              >
-                {/* Tab Bar */}
-                <div className="bg-slate-100 border-b px-6 py-3 overflow-x-auto">
-                  <TabsList className="bg-white p-1 h-auto inline-flex gap-2 rounded-lg border shadow-sm">
-                    {Object.keys(auditResults).map((url) => (
-                      <TabsTrigger
-                        key={url}
-                        value={url}
-                        className="data-[state=active]:bg-primary data-[state=active]:text-white px-4 py-2 text-sm"
-                      >
-                        {url.replace(/^https?:\/\//, "").split("/")[0]}...
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </div>
-
-                {/* Tab Content */}
-                {Object.entries(auditResults).map(([url, data]) => {
-                  const report = data.report || [];
-                  const summary = data.summary || {
-                    total: 0,
-                    critical: 0,
-                    serious: 0,
-                    minor: 0,
-                    india_compliance: "N/A",
-                    status: "Unknown",
-                  };
-
-                  // --- METRIC CALCULATION ---
-                  // Count issues based on the 'category' field populated by the Backend Agents
-                  const syntaxCount = report.filter(
-                    (i) =>
-                      i.category === "syntax" || (!i.category && !i.is_vision)
-                  ).length;
-                  const visualCount = report.filter(
-                    (i) => i.category === "visual" || i.is_vision
-                  ).length;
-                  const semanticCount = report.filter(
-                    (i) => i.category === "semantic"
-                  ).length;
-                  const interactionCount = report.filter(
-                    (i) => i.category === "interaction"
-                  ).length;
-
-                  return (
-                    <TabsContent
-                      key={url}
-                      value={url}
-                      className="p-6 space-y-8 animate-in fade-in duration-300"
-                    >
-                      {/* A. AGENT BREAKDOWN CARDS (Replaces Old Status Cards) */}
-                      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                        <MetricCard
-                          label="Total Issues"
-                          value={summary.total}
-                          icon={<AlertCircle />}
-                        />
-                        <MetricCard
-                          label="Syntax (Axe)"
-                          value={syntaxCount}
-                          color="text-blue-600"
-                          bg="bg-blue-50"
-                          icon={<FileCode />}
-                        />
-                        <MetricCard
-                          label="Visual AI"
-                          value={visualCount}
-                          color="text-purple-600"
-                          bg="bg-purple-50"
-                          icon={<Eye />}
-                        />
-                        <MetricCard
-                          label="Semantics"
-                          value={semanticCount}
-                          color="text-pink-600"
-                          bg="bg-pink-50"
-                          icon={<Type />}
-                        />
-                        <MetricCard
-                          label="Interaction"
-                          value={interactionCount}
-                          color="text-indigo-600"
-                          bg="bg-indigo-50"
-                          icon={<MousePointer2 />}
-                        />
-                      </div>
-
-                      {/* C. Detailed Task List */}
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-5 h-5 text-slate-700" />
-                          <h3 className="text-lg font-bold text-slate-900">
-                            Agent Findings & Remediation
-                          </h3>
-                        </div>
-
-                        {report.length === 0 ? (
-                          <div className="text-center py-12 bg-white rounded-xl border border-dashed">
-                            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-slate-900">
-                              No issues found!
-                            </h3>
-                          </div>
-                        ) : (
-                          <Accordion
-                            type="single"
-                            collapsible
-                            className="w-full space-y-3"
-                          >
-                            {report.map((issue, idx) => {
-                              const priority = issue.fix_priority || "LOW";
-                              const category =
-                                issue.category ||
-                                (issue.is_vision ? "visual" : "syntax");
-
-                              return (
-                                <AccordionItem
-                                  key={idx}
-                                  value={`item-${idx}`}
-                                  className="bg-white border border-slate-200 rounded-lg px-0 overflow-hidden data-[state=open]:ring-1 data-[state=open]:ring-primary"
-                                >
-                                  <AccordionTrigger className="px-4 py-4 hover:bg-slate-50 hover:no-underline">
-                                    <div className="flex items-center gap-4 text-left w-full">
-                                      <PriorityBadge priority={priority} />
-
-                                      {/* Category Badge */}
-                                      <Badge
-                                        className={`
-                                        border 
-                                        ${
-                                          category === "semantic"
-                                            ? "bg-pink-100 text-pink-700 border-pink-200"
-                                            : ""
-                                        }
-                                        ${
-                                          category === "interaction"
-                                            ? "bg-indigo-100 text-indigo-700 border-indigo-200"
-                                            : ""
-                                        }
-                                        ${
-                                          category === "visual"
-                                            ? "bg-purple-100 text-purple-700 border-purple-200"
-                                            : ""
-                                        }
-                                        ${
-                                          category === "syntax"
-                                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                                            : ""
-                                        }
-                                      `}
-                                      >
-                                        {category === "syntax"
-                                          ? "Code"
-                                          : category.charAt(0).toUpperCase() +
-                                            category.slice(1)}
-                                      </Badge>
-
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-semibold text-slate-800">
-                                            {issue.rule}
-                                          </span>
-                                        </div>
-                                        <p className="text-sm text-slate-500 line-clamp-1">
-                                          {issue.description}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </AccordionTrigger>
-
-                                  <AccordionContent className="bg-slate-50/50 border-t px-6 py-6">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                      {/* Left: The Problem */}
-                                      <div className="space-y-4">
-                                        <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                                          <AlertCircle className="w-4 h-4" />{" "}
-                                          The Violation
-                                        </h4>
-                                        <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3 text-sm">
-                                          <div>
-                                            <span className="font-semibold text-slate-500">
-                                              WCAG Criteria:
-                                            </span>{" "}
-                                            {issue.wcag_sc || "N/A"}
-                                          </div>
-                                          <div>
-                                            <span className="font-semibold text-slate-500">
-                                              Selector:
-                                            </span>{" "}
-                                            <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700">
-                                              {issue.selector?.slice(0, 60) ||
-                                                "N/A"}
-                                              ...
-                                            </code>
-                                          </div>
-                                          <div className="mt-2">
-                                            <span className="font-semibold text-slate-500 block mb-1">
-                                              Detected Source:
-                                            </span>
-                                            <pre className="bg-slate-900 text-slate-100 text-xs rounded-lg p-3 overflow-x-auto border border-slate-800">
-                                              <code>
-                                                {issue.html_snippet ||
-                                                  "Code not available (Visual/State Issue)"}
-                                              </code>
-                                            </pre>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Right: The Fix */}
-                                      <div className="space-y-4">
-                                        <h4 className="text-sm font-bold text-green-700 uppercase tracking-wider flex items-center gap-2">
-                                          <Rocket className="w-4 h-4" /> AI
-                                          Solution
-                                        </h4>
-
-                                        {issue.ai_explanation ? (
-                                          <div className="space-y-3">
-                                            <div className="bg-orange-50 p-3 rounded-md text-sm text-orange-900 border border-orange-100">
-                                              {issue.ai_explanation}
-                                            </div>
-                                            <div className="relative">
-                                              <div className="absolute top-0 right-0 bg-green-600 text-white text-[10px] px-2 py-1 rounded-bl-md rounded-tr-md font-bold">
-                                                FIXED
-                                              </div>
-                                              <pre className="bg-green-50 p-4 rounded-md border border-green-200 text-xs overflow-x-auto text-green-900 font-mono">
-                                                {issue.ai_fixed_code ||
-                                                  "Manual fix required"}
-                                              </pre>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-200 rounded-lg">
-                                            <span className="text-slate-400 text-sm italic">
-                                              AI fix pending...
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </AccordionContent>
-                                </AccordionItem>
-                              );
-                            })}
-                          </Accordion>
-                        )}
-                      </div>
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
-            </CardContent>
-          </Card>
+        {/* Audit Results */}
+        {auditResult && (
+          <AuditReportView data={auditResult as any} url={url} />
         )}
       </main>
     </div>
-  );
-}
-
-// --- SUB COMPONENTS ---
-
-function MetricCard({
-  label,
-  value,
-  color = "text-slate-900",
-  bg = "bg-slate-100",
-  icon,
-}: any) {
-  return (
-    <div
-      className={`p-4 rounded-xl border shadow-sm flex items-center justify-between bg-white`}
-    >
-      <div>
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          {label}
-        </p>
-        <h3 className={`text-2xl font-extrabold ${color} mt-1`}>{value}</h3>
-      </div>
-      <div className={`p-2.5 ${bg} rounded-lg`}>
-        {icon && <div className={`w-5 h-5 ${color}`}>{icon}</div>}
-      </div>
-    </div>
-  );
-}
-
-function PriorityBadge({ priority }: { priority: string }) {
-  if (priority.includes("CRITICAL") || priority.includes("HIGH")) {
-    return (
-      <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-200">
-        Critical
-      </Badge>
-    );
-  }
-  if (priority.includes("MEDIUM")) {
-    return (
-      <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200">
-        Serious
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-      Minor
-    </Badge>
   );
 }

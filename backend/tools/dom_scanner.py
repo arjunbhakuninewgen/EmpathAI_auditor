@@ -28,19 +28,39 @@ async def scan_page(url: str):
         page = await context.new_page()
 
         try:
-            # --- NAVIGATION ---
+            # --- NAVIGATION (with fallback) ---
             print("⏳ TOOL: Navigating...")
-            await page.goto(url, timeout=60000, wait_until="networkidle")
-            await page.wait_for_timeout(3000)
+            try:
+                # First try with domcontentloaded (faster, more reliable)
+                await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                # Wait a bit for JS to execute
+                await page.wait_for_timeout(2000)
+            except Exception as nav_error:
+                print(f"⚠️ First navigation attempt failed: {nav_error}")
+                # Retry with just load event
+                try:
+                    await page.goto(url, timeout=30000, wait_until="load")
+                    await page.wait_for_timeout(2000)
+                except Exception as retry_error:
+                    print(f"⚠️ Retry also failed: {retry_error}")
+                    # Last resort - just try to get whatever loaded
+                    await page.goto(url, timeout=30000, wait_until="commit")
+                    await page.wait_for_timeout(3000)
 
             page_title = await page.title()
             html = await page.content()
             print(f"🔍 DEBUG: Page title = {page_title!r}")
             print(f"🔍 DEBUG: HTML length = {len(html)}")
 
-            # --- SCREENSHOT ---
-            screenshot_bytes = await page.screenshot(full_page=False)
-            screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+            # --- SCREENSHOT (with timeout protection) ---
+            screenshot_b64 = None
+            try:
+                screenshot_bytes = await page.screenshot(full_page=False, timeout=10000)
+                screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+                print("📸 Screenshot captured successfully")
+            except Exception as ss_error:
+                print(f"⚠️ Screenshot failed (non-fatal): {ss_error}")
+                screenshot_b64 = None
 
             # --- SEMANTIC CONTENT (NON-FATAL) ---
             print("🧠 TOOL: Extracting semantic content...")
@@ -164,6 +184,7 @@ async def scan_page(url: str):
                 "violations": clean_violations(violations),
                 "screenshot": screenshot_b64,
                 "title": page_title,
+                "html": html,  # For DOM hash computation
                 "dom_content": dom_content,
                 "tab_log": tab_log,
             }
