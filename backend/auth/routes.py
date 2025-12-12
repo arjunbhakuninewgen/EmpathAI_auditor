@@ -21,6 +21,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: Optional[str] = None
+    organization: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -38,6 +40,12 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: Optional[str]
+    organization: Optional[str]
+    phone: Optional[str]
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
 
 # --- Routes ---
@@ -57,7 +65,14 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     
     # Create user
     password_hash = hash_password(user_data.password)
-    user = crud.create_user(db, user_data.email, password_hash, user_data.name)
+    user = crud.create_user(
+        db,
+        user_data.email,
+        password_hash,
+        name=user_data.name,
+        organization=user_data.organization,
+        phone=user_data.phone
+    )
     
     # Generate token
     token = create_access_token(str(user.id), user.email)
@@ -68,7 +83,9 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         "user": {
             "id": str(user.id),
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "organization": user.organization,
+            "phone": user.phone
         }
     }
 
@@ -94,7 +111,9 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         "user": {
             "id": str(user.id),
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "organization": user.organization,
+            "phone": user.phone
         }
     }
 
@@ -105,3 +124,16 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     Get current user info from JWT token.
     """
     return current_user
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """
+    Placeholder forgot-password endpoint.
+    In production, trigger email flow to deliver reset link/OTP.
+    """
+    # No-op: intentionally avoid revealing whether the email exists.
+    return {
+        "status": "ok",
+        "message": "If an account exists for this email, a reset link will be sent."
+    }

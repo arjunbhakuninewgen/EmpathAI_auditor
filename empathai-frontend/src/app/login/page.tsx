@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Lock, Mail, AlertCircle, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Lock, Mail, AlertCircle, Eye, EyeOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -67,9 +68,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-center px-16 w-full">
           {/* Logo & App Name */}
           <div className="flex items-center gap-4 mb-8">
-            <div className="bg-primary p-4 rounded-2xl shadow-2xl shadow-orange-500/20">
-              <ShieldCheck className="w-12 h-12 text-white" />
-            </div>
+            <img src="/ndw-logo.svg" alt="NDW Logo" className="h-[58px]" />
             <div>
               <h1 className="text-4xl font-bold text-white tracking-tight">
                 A11ySutra
@@ -115,12 +114,6 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Footer */}
-          <div className="absolute bottom-10 left-16">
-            <p className="text-slate-500 text-sm">
-              By <span className="text-white font-semibold">Newgen Digital</span>
-            </p>
-          </div>
         </div>
       </div>
 
@@ -129,9 +122,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile Logo (shown only on small screens) */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="bg-primary p-2.5 rounded-xl">
-              <ShieldCheck className="w-8 h-8 text-white" />
-            </div>
+            <img src="/ndw-logo.svg" alt="NDW Logo" className="h-[38px]" />
             <span className="text-2xl font-bold text-slate-900">A11ySutra</span>
           </div>
 
@@ -213,14 +204,20 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Info */}
-              <div className="mt-6 p-4 bg-slate-100 rounded-lg border border-slate-200">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                  Account Info
-                </p>
-                <p className="text-sm text-slate-600">
-                  Use your registered email and password. Contact admin if you need access.
-                </p>
+              {/* Forgot / Signup Links */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary font-medium hover:underline text-left"
+                >
+                  Forgot Password?
+                </Link>
+                <div className="text-sm text-slate-600">
+                  Don&apos;t have an account?{" "}
+                  <Link href="/signup" className="text-primary font-semibold hover:underline">
+                    Create one
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -237,6 +234,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Rocket,
-  ShieldCheck,
   AlertCircle,
   Menu,
 } from "lucide-react";
@@ -238,9 +237,7 @@ export default function Home() {
       <nav className="bg-white border-b sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-primary p-1.5 rounded-lg">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
+            <img src="/ndw-logo.svg" alt="NDW Logo" className="h-[22px]" />
             <span className="font-bold text-xl tracking-tight">
               A11ySutra
             </span>

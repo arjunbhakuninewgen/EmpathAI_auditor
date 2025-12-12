@@ -21,12 +21,21 @@ def get_user_by_id(db: Session, user_id: UUID) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 
-def create_user(db: Session, email: str, password_hash: str, name: str = None) -> models.User:
+def create_user(
+    db: Session,
+    email: str,
+    password_hash: str,
+    name: str = None,
+    organization: str = None,
+    phone: str = None
+) -> models.User:
     """Create a new user."""
     user = models.User(
         email=email,
         password_hash=password_hash,
-        name=name
+        name=name,
+        organization=organization,
+        phone=phone
     )
     db.add(user)
     db.commit()

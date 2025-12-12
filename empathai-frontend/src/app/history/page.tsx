@@ -32,6 +32,26 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userInfo, setUserInfo] = useState<{name: string} | null>(null);
 
+  const formatDateTimeIST = (isoString: string) => {
+    const utcDate = new Date(isoString);
+    // Manually shift UTC to IST (+5:30) to avoid locale quirks
+    const istDate = new Date(utcDate.getTime() + 5.5 * 60 * 60 * 1000);
+
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const day = pad(istDate.getDate());
+    const month = pad(istDate.getMonth() + 1);
+    const year = istDate.getFullYear().toString().slice(-2);
+
+    let hours = istDate.getHours();
+    const minutes = pad(istDate.getMinutes());
+    const seconds = pad(istDate.getSeconds());
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    const hourStr = pad(hours);
+
+    return `${day}/${month}/${year} at ${hourStr}:${minutes}:${seconds} ${ampm}`;
+  };
+
   useEffect(() => {
     // Auth Check
     const token = localStorage.getItem("ay11sutra_token");
@@ -154,7 +174,7 @@ export default function HistoryPage() {
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {new Date(audit.created_at).toLocaleDateString()} at {new Date(audit.created_at).toLocaleTimeString()}
+                        {formatDateTimeIST(audit.created_at)}
                       </span>
                     </div>
                   </div>

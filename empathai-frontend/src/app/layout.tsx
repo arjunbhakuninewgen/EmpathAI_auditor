@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A11ySutra - AI-Powered Accessibility Auditor",
+  title: "NDW - AI-Powered Accessibility Auditor",
   description: "Autonomous accessibility auditing with AI-powered fixes for WCAG & GIGW 3.0 compliance",
+  icons: "/ndw-logo.svg",
 };
 
 export default function RootLayout({
