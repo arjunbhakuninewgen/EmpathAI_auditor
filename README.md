@@ -112,7 +112,7 @@ GOOGLE_API_KEY=your_gemini_api_key
 
 Create `empathai-frontend/.env`:
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_API_BASE_URL=https://empathai-backend-production-a6c7.up.railway.app
 ```
 
 ### 3️⃣ Run
@@ -121,7 +121,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```bash
 cd backend
 python main.py
-# Runs at http://localhost:8000
+# Runs at https://empathai-backend-production-a6c7.up.railway.app
 ```
 
 **Terminal 2 - Frontend:**
