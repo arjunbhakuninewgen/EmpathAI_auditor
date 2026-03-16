@@ -28,19 +28,39 @@ async def scan_page(url: str):
         page = await context.new_page()
 
         try:
-            # --- NAVIGATION ---
+            # --- NAVIGATION (with fallback) ---
             print("⏳ TOOL: Navigating...")
-            await page.goto(url, timeout=60000, wait_until="networkidle")
-            await page.wait_for_timeout(3000)
+            try:
+                # First try with domcontentloaded (faster, more reliable)
+                await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                # Wait a bit for JS to execute
+                await page.wait_for_timeout(2000)
+            except Exception as nav_error:
+                print(f"⚠️ First navigation attempt failed: {nav_error}")
+                # Retry with just load event
+                try:
+                    await page.goto(url, timeout=30000, wait_until="load")
+                    await page.wait_for_timeout(2000)
+                except Exception as retry_error:
+                    print(f"⚠️ Retry also failed: {retry_error}")
+                    # Last resort - just try to get whatever loaded
+                    await page.goto(url, timeout=30000, wait_until="commit")
+                    await page.wait_for_timeout(3000)
 
             page_title = await page.title()
             html = await page.content()
             print(f"🔍 DEBUG: Page title = {page_title!r}")
             print(f"🔍 DEBUG: HTML length = {len(html)}")
 
-            # --- SCREENSHOT ---
-            screenshot_bytes = await page.screenshot(full_page=False)
-            screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+            # --- SCREENSHOT (with timeout protection) ---
+            screenshot_b64 = None
+            try:
+                screenshot_bytes = await page.screenshot(full_page=False, timeout=10000)
+                screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+                print("📸 Screenshot captured successfully")
+            except Exception as ss_error:
+                print(f"⚠️ Screenshot failed (non-fatal): {ss_error}")
+                screenshot_b64 = None
 
             # --- SEMANTIC CONTENT (NON-FATAL) ---
             print("🧠 TOOL: Extracting semantic content...")
@@ -50,10 +70,20 @@ async def scan_page(url: str):
                     () => ({
                         links: Array.from(document.querySelectorAll('a[href]'))
                             .slice(0, 50)
-                            .map(a => ({
-                                text: a.innerText.trim() || "No Text",
-                                href: a.href
-                            })),
+                            .map(a => {
+                                // Helper to generate a simple unique selector
+                                const getSelector = (el) => {
+                                    if (el.id) return '#' + el.id;
+                                    if (el.className) return '.' + el.className.split(' ')[0];
+                                    return el.tagName.toLowerCase();
+                                };
+                                return {
+                                    text: a.innerText.trim() || "No Text",
+                                    href: a.href,
+                                    html: a.outerHTML.substring(0, 200), // Capture snippet
+                                    selector: getSelector(a) // Basic selector
+                                };
+                            }),
                         headings: Array.from(
                             document.querySelectorAll('h1, h2, h3, h4, h5, h6')
                         ).map(h => ({
@@ -107,41 +137,46 @@ async def scan_page(url: str):
             results = await axe.run(page)
 
             print(f"🔍 DEBUG: Axe result type = {type(results)}")
-            print(f"🔍 DEBUG: Axe has 'violations' attr? {hasattr(results, 'violations')}")
-            print(f"🔍 DEBUG: Axe has 'to_dict' attr? {hasattr(results, 'to_dict')}")
-            print(f"🔍 DEBUG: Axe has '__getitem__' attr? {hasattr(results, '__getitem__')}")
+            print(f"🔍 DEBUG: Axe violations_count = {getattr(results, 'violations_count', 'N/A')}")
 
             # ------- ROBUST VIOLATION EXTRACTION -------
             violations = []
 
-            # Strategy 1: direct attribute (some versions expose this)
-            if hasattr(results, "violations"):
+            # The axe-playwright-python library stores results in the 'response' property
+            # which is a dict containing 'violations', 'passes', 'incomplete', etc.
+            try:
+                if hasattr(results, 'response') and results.response:
+                    response_data = results.response
+                    if isinstance(response_data, dict):
+                        violations = response_data.get("violations", []) or []
+                        print(f"🔍 DEBUG: Extracted {len(violations)} violations from response.violations")
+                    elif isinstance(response_data, str):
+                        # Sometimes it's a JSON string
+                        import json
+                        response_dict = json.loads(response_data)
+                        violations = response_dict.get("violations", []) or []
+                        print(f"🔍 DEBUG: Extracted {len(violations)} violations from JSON response")
+            except Exception as e:
+                print(f"⚠️ Failed to extract from response: {e}")
+
+            # Fallback: Try direct attribute access
+            if not violations and hasattr(results, "violations"):
                 try:
                     violations = results.violations or []
-                except Exception:
-                    pass
+                    print(f"🔍 DEBUG: Extracted {len(violations)} violations from direct attribute")
+                except Exception as e:
+                    print(f"⚠️ Failed direct attribute access: {e}")
 
-            # Strategy 2: mapping-style access (your version is likely doing this)
+            # Fallback: Try dict-style access
             if not violations and hasattr(results, "__getitem__"):
                 try:
                     violations = results["violations"] or []
-                except Exception:
-                    pass
-
-            # Strategy 3: dict
-            if not violations and isinstance(results, dict):
-                violations = results.get("violations", []) or []
-
-            # Strategy 4: response wrapper
-            if not violations and hasattr(results, "response"):
-                try:
-                    resp = getattr(results, "response", {}) or {}
-                    if isinstance(resp, dict):
-                        violations = resp.get("violations", []) or []
-                except Exception:
-                    pass
+                    print(f"🔍 DEBUG: Extracted {len(violations)} violations from dict access")
+                except Exception as e:
+                    print(f"⚠️ Failed dict access: {e}")
 
             print(f"✅ TOOL: Found {len(violations)} raw syntax violations.")
+
 
             await browser.close()
 
@@ -149,6 +184,7 @@ async def scan_page(url: str):
                 "violations": clean_violations(violations),
                 "screenshot": screenshot_b64,
                 "title": page_title,
+                "html": html,  # For DOM hash computation
                 "dom_content": dom_content,
                 "tab_log": tab_log,
             }

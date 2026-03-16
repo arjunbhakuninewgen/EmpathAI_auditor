@@ -9,26 +9,29 @@ from backend.graph.nodes import (
     critic_node, 
     fixer_node, 
     vision_analyzer_node,
-    semantic_node,      # New
-    interaction_node    # New
+    semantic_node,
+    interaction_node,
+    input_guard_node  # New
 )
 
 def create_audit_graph():
     workflow = StateGraph(AuditState)
 
     # 1. Add Nodes
+    workflow.add_node("input_guard", input_guard_node) # New
     workflow.add_node("scanner", scanner_node)
     workflow.add_node("critic", critic_node)
-    workflow.add_node("semantic", semantic_node)       # New
-    workflow.add_node("interaction", interaction_node) # New
+    workflow.add_node("semantic", semantic_node)
+    workflow.add_node("interaction", interaction_node)
     workflow.add_node("vision", vision_analyzer_node)
     workflow.add_node("fixer", fixer_node)
 
     # 2. Define Edges (The Flow)
-    workflow.set_entry_point("scanner")
+    workflow.set_entry_point("input_guard")
     
     # Connect them in a chain:
-    # Scanner -> Critic -> Semantic -> Interaction -> Vision -> Fixer -> END
+    # Input Guard -> Scanner -> Critic -> Semantic -> Interaction -> Vision -> Fixer -> END
+    workflow.add_edge("input_guard", "scanner")
     workflow.add_edge("scanner", "critic")
     workflow.add_edge("critic", "semantic")
     workflow.add_edge("semantic", "interaction")
