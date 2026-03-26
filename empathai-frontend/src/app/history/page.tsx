@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://empathai-backend-production-a6c7.up.railway.app";
+import { apiFetch } from "@/lib/api";
+
 
 interface AuditHistoryItem {
   id: string;
@@ -61,24 +62,21 @@ export default function HistoryPage() {
     }
 
     // Fetch User & Audits
-    fetchAudits(token);
-    fetchUser(token);
+    fetchAudits();
+    fetchUser();
   }, [router]);
 
   // Debounced search effect
   useEffect(() => {
     const timer = setTimeout(() => {
-      const token = localStorage.getItem("ay11sutra_token");
-      if (token) fetchAudits(token, searchQuery);
+      fetchAudits(searchQuery);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const fetchUser = async (token: string) => {
+  const fetchUser = async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch("/auth/me");
       if (res.ok) {
         const data = await res.json();
         setUserInfo({ name: data.name });
@@ -88,21 +86,15 @@ export default function HistoryPage() {
     }
   };
 
-  const fetchAudits = async (token: string, query: string = "") => {
+  const fetchAudits = async (query: string = "") => {
     setLoading(true);
     try {
-      const url = new URL(`${API_BASE}/audits`);
-      if (query) url.searchParams.append("query", query);
-      
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const queryStr = query ? `?query=${encodeURIComponent(query)}` : "";
+      const res = await apiFetch(`/audits${queryStr}`);
       
       if (res.ok) {
         const data = await res.json();
         setAudits(data.audits);
-      } else if (res.status === 401) {
-        router.push("/login");
       }
     } catch (err) {
       console.error("Failed to fetch history", err);

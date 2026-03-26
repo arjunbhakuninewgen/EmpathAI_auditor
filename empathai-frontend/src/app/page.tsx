@@ -19,9 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AuditReportView } from "@/components/audit-report-view";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://empathai-backend-production-a6c7.up.railway.app";
+import { apiFetch } from "@/lib/api";
 
 // Valid TLDs for URL validation
 const VALID_TLDS = [
@@ -90,18 +88,10 @@ export default function Home() {
       if (auth === "true" && token) {
         setIsAuthenticated(true);
         try {
-          const res = await fetch(`${API_BASE}/auth/me`, {
-            method: "GET",
-            headers: { "Authorization": `Bearer ${token}` },
-          });
-          
+          const res = await apiFetch("/auth/me");
           if (res.ok) {
             const data = await res.json();
             setUserInfo({ name: data.name, email: data.email });
-          } else {
-            console.error("Auth token invalid or expired");
-            // Optional: Auto-logout if token is bad?
-            // handleLogout(); 
           }
         } catch (err) {
           console.error("Failed to fetch user info", err);
@@ -189,12 +179,8 @@ export default function Home() {
       // Get JWT token
       const token = localStorage.getItem("ay11sutra_token");
       
-      const res = await fetch(`${API_BASE}/audit`, {
+      const res = await apiFetch("/audit", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
         body: JSON.stringify({ url: auditUrl }),
       });
 

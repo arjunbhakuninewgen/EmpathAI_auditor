@@ -3,6 +3,7 @@
 Authentication API routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -10,7 +11,7 @@ from typing import Optional
 from database.connection import get_db
 from database import crud
 from .password import hash_password, verify_password
-from .jwt import create_access_token, get_current_user
+from .jwt import create_access_token, get_current_user, verify_token_ignore_exp
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -124,6 +125,51 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     Get current user info from JWT token.
     """
     return current_user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    db: Session = Depends(get_db)
+):
+    """
+    Silent token refresh endpoint.
+    Accepts an expired (but not tampered / too old) Bearer token and returns a fresh access_token.
+    """
+    old_token = credentials.credentials
+    payload = verify_token_ignore_exp(old_token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token is invalid or too old to refresh",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id: str = payload.get("sub")
+    email: str = payload.get("email")
+
+    # Double-check user still exists in DB
+    user = crud.get_user_by_email(db, email)
+    if not user or str(user.id) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    new_token = create_access_token(str(user.id), user.email)
+
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "organization": user.organization,
+            "phone": user.phone,
+        },
+    }
 
 
 @router.post("/forgot-password")

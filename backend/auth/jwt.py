@@ -17,6 +17,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET", "change-this-in-production-to-a-secure-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
+REFRESH_WINDOW_HOURS = 72  # Accept expired tokens up to 72 hours old for silent refresh
 
 security = HTTPBearer()
 
@@ -37,6 +38,28 @@ def verify_token(token: str) -> Optional[dict]:
     """Verify and decode a JWT token."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+def verify_token_ignore_exp(token: str) -> Optional[dict]:
+    """Decode a JWT token without validating expiry — for use in silent token refresh only."""
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+            options={"verify_exp": False},
+        )
+        # Only allow refresh within REFRESH_WINDOW_HOURS after expiry
+        exp = payload.get("exp")
+        iat = payload.get("iat")
+        if exp is None or iat is None:
+            return None
+        exp_dt = datetime.utcfromtimestamp(exp)
+        if datetime.utcnow() > exp_dt + timedelta(hours=REFRESH_WINDOW_HOURS):
+            return None  # too old to refresh
         return payload
     except JWTError:
         return None

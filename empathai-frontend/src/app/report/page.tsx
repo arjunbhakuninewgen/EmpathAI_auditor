@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AuditReportView } from "@/components/audit-report-view";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://empathai-backend-production-a6c7.up.railway.app";
+import { apiFetch } from "@/lib/api";
+
 
 function ReportContent() {
   const router = useRouter();
@@ -28,17 +29,15 @@ function ReportContent() {
       return;
     }
     setIsAuthenticated(true);
-    fetchUser(token);
+    fetchUser();
     if (id) {
-        fetchAuditDetail(token, id);
+        fetchAuditDetail(id);
     }
   }, [id, router]);
 
-  const fetchUser = async (token: string) => {
+  const fetchUser = async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch("/auth/me");
       if (res.ok) {
         const data = await res.json();
         setUserInfo({ name: data.name, email: data.email });
@@ -48,11 +47,9 @@ function ReportContent() {
     }
   };
 
-  const fetchAuditDetail = async (token: string, auditId: string) => {
+  const fetchAuditDetail = async (auditId: string) => {
     try {
-      const res = await fetch(`${API_BASE}/audits/${auditId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch(`/audits/${auditId}`);
       
       if (res.ok) {
         const rawData = await res.json();
